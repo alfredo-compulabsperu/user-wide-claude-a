@@ -1,5 +1,6 @@
 {
   "enabledPlugins": {
-    "ecc@ecc": true
+    "ecc@ecc": true,
+    "claude-md-management@claude-plugins-official": true
   }
 }
