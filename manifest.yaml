@@ -1,0 +1,62 @@
+version: 1
+generated: "2026-06-11"  # Update manually or via generation tool
+idempotency: skip  # skip | overwrite | prompt — sync script default
+
+skills:
+  - name: humanizer
+  - name: learned
+  - name: legal
+  - name: legal-agreement
+  - name: legal-compare
+  - name: legal-compliance
+  - name: legal-freelancer
+  - name: legal-missing
+  - name: legal-nda
+  - name: legal-negotiate
+  - name: legal-plain
+  - name: legal-privacy
+  - name: legal-report-pdf
+  - name: legal-review
+  - name: legal-risks
+  - name: legal-terms
+  - name: skill-stocktake
+  - name: worktree-cleaner
+  - name: worktree-summary
+
+commands:
+  - name: merge-branches.md
+  - name: merge-from-main.md
+  - name: prp-prd-auto.md
+  - name: session-summary.md
+  - name: vm-cleanup.md
+  - name: archived/merge-to-main.md
+
+agents:
+  - name: legal-clauses.md
+  - name: legal-compliance.md
+  - name: legal-recommendations.md
+  - name: legal-risks.md
+  - name: legal-terms.md
+  - name: linux-dev-vm-expert.md
+  - name: prd-answerer.md
+
+scripts:
+  - name: vm-cleanup.sh
+    executable: true
+
+claude_md:
+  portable: true
+
+plugins:
+  - id: context-mode
+    marketplace: context-mode
+    scope: user
+  - id: commercial-legal
+    marketplace: claude-for-legal
+    scope: user
+  - id: employment-legal
+    marketplace: claude-for-legal
+    scope: user
+  - id: ecc
+    marketplace: ecc
+    scope: user

@@ -79,11 +79,11 @@ We'll know we're right when **a fresh machine reaches full user-wide Claude arti
 | # | Milestone | Outcome | Status | Plan |
 |---|---|---|---|---|
 | 1 | Artifact audit | Canonical portable and excluded artifact types confirmed | complete | — |
-| 2 | Manifest format | Manifest schema defined and populated with current artifact set | pending | — |
-| 3 | Sync script | A new machine reaches full artifact parity by running one command; `--dry-run` flag reports missing/stale/local-only artifacts without applying changes | pending | — |
-| 4 | `/validate-artifact` skill | An artifact can be validated as repo-agnostic, dependency-complete, and terse — standalone, callable independently of promote | pending | — |
-| 5 | `/promote-artifact` skill (local) | An artifact passes validation then is copied to `~/.claude/<type>/` — works offline, no git required | pending | — |
-| 6 | `/promote-artifact` git pipeline | Promoted artifact is branched, committed, pushed, PR created, and squash-merged automatically — no auto-review, no auto-fix | pending | — |
+| 2 | Manifest format | Manifest schema defined and populated with current artifact set | complete | `.claude/plans/plan-m2-manifest.plan.md` |
+| 3 | Sync script | A new machine reaches full artifact parity by running one command; `--dry-run` flag reports missing/stale/local-only artifacts without applying changes | complete | `.claude/plans/plan-m3-sync-script.plan.md` |
+| 4 | `/validate-artifact` skill | An artifact can be validated as repo-agnostic, dependency-complete, and terse — standalone, callable independently of promote | complete | `.claude/plans/plan-m4-validate-artifact.plan.md` |
+| 5 | `/promote-artifact` skill (local) | An artifact passes validation then is copied to `~/.claude/<type>/` — works offline, no git required | complete | `.claude/plans/plan-m5-promote-local.plan.md` |
+| 6 | `/promote-artifact` git pipeline | Promoted artifact is branched, committed, pushed, PR created, and squash-merged automatically — no auto-review, no auto-fix | complete | `.claude/plans/plan-m6-promote-git.plan.md` |
 
 ## Open Questions
 
