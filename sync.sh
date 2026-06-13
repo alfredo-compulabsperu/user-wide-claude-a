@@ -371,14 +371,14 @@ echo "--- skills ---"
 names=$(yaml_get_names skills) || { echo "ERROR: manifest parse failed for skills" >&2; exit 1; }
 while IFS= read -r name; do
   [[ -n "$name" ]] || continue
-  install_dir "$REPO_DIR/skills/$name" "$CLAUDE_DIR/skills/$name" "skills/$name"
+  install_dir "$REPO_DIR/.claude/skills/$name" "$CLAUDE_DIR/skills/$name" "skills/$name"
 done <<< "$names"
 
 echo "--- commands ---"
 names=$(yaml_get_names commands) || { echo "ERROR: manifest parse failed for commands" >&2; exit 1; }
 while IFS= read -r name; do
   [[ -n "$name" ]] || continue
-  src="$REPO_DIR/commands/$name"
+  src="$REPO_DIR/.claude/commands/$name"
   dest="$CLAUDE_DIR/commands/$name"
   if [[ -d "$src" ]]; then
     install_dir "$src" "$dest" "commands/$name"
@@ -391,7 +391,7 @@ echo "--- agents ---"
 names=$(yaml_get_names agents) || { echo "ERROR: manifest parse failed for agents" >&2; exit 1; }
 while IFS= read -r name; do
   [[ -n "$name" ]] || continue
-  install_file "$REPO_DIR/agents/$name" "$CLAUDE_DIR/agents/$name" "agents/$name"
+  install_file "$REPO_DIR/.claude/agents/$name" "$CLAUDE_DIR/agents/$name" "agents/$name"
 done <<< "$names"
 
 echo "--- scripts ---"
@@ -401,7 +401,7 @@ while IFS= read -r entry; do
   name="${entry%%|*}"
   executable="${entry##*|}"
   dest="$CLAUDE_DIR/scripts/$name"
-  install_file "$REPO_DIR/scripts/$name" "$dest" "scripts/$name"
+  install_file "$REPO_DIR/.claude/scripts/$name" "$dest" "scripts/$name"
   if [[ "$executable" == "true" && -f "$dest" && $DRY_RUN -eq 0 ]]; then
     chmod +x "$dest"
   fi
@@ -410,7 +410,7 @@ done <<< "$scripts"
 echo "--- claude_md ---"
 portable=$(yaml_get_claude_md_portable) || { echo "ERROR: manifest parse failed for claude_md" >&2; exit 1; }
 if [[ "$portable" == "true" ]]; then
-  install_file "$REPO_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md" "CLAUDE.md"
+  install_file "$REPO_DIR/.claude/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md" "CLAUDE.md"
 else
   echo "  [SKIP]     CLAUDE.md (portable: false)"
 fi
