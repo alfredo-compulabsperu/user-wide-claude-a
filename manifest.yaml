@@ -4,11 +4,17 @@ idempotency: skip  # skip | overwrite | prompt — sync script default
 
 skills: []
 
-commands: []
+commands:
+  - name: open-gh-issue.md
+  - name: open-gh-pr.md
 
 agents: []
 
-scripts: []
+scripts:
+  - name: open-gh-issue.sh
+    executable: true
+  - name: open-gh-pr.sh
+    executable: true
 
 claude_md:
   portable: false
