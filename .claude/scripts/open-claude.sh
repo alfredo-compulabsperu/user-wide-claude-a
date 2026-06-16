@@ -1,12 +1,27 @@
 #!/usr/bin/env bash
-# open-claude.sh — launch claude in a new tmux window
+# open-claude.sh — launch claude CLI; opens a named tmux window when inside tmux
 #
 # Usage:
-#   open-claude [-w <name>] [claude-args...]
-#   open-claude -p [claude-args...]   # passthrough: exec claude directly
+#   open-claude [args...]
+#   open-claude -p [args...]   # force passthrough (no new tmux window)
+#   open-claude --print [args...] # same as -p
 
 set -euo pipefail
 
+# has_flag <flag> "$@"
+# Returns 0 if <flag> appears in the argument list, 1 otherwise.
+# Handles both short form (-x) and long form (--long).
+has_flag() {
+  local flag="$1"
+  shift
+  for arg in "$@"; do
+    [[ "$arg" == "$flag" ]] && return 0
+  done
+  return 1
+}
+
+# get_worktree_name
+# Returns the basename of the git worktree root, falling back to "claude".
 get_worktree_name() {
   local root
   root=$(git rev-parse --show-toplevel 2>/dev/null || true)
@@ -17,33 +32,14 @@ get_worktree_name() {
   fi
 }
 
-window_name=""
-passthrough=false
-claude_args=()
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -w) shift; window_name="${1:-}"; claude_args+=("-w" "${window_name}"); shift ;;
-    -p|--print) passthrough=true; shift ;;
-    *) claude_args+=("$1"); shift ;;
-  esac
-done
-
-if [[ "$passthrough" == true ]]; then
-  exec claude "${claude_args[@]+"${claude_args[@]}"}"
+# Main logic
+if [[ -n "${TMUX:-}" ]] && ! has_flag "-p" "$@" && ! has_flag "--print" "$@"; then
+  # Build a safely-quoted command string for tmux
+  cmd="claude"
+  for arg in "$@"; do
+    cmd="${cmd} $(printf '%q' "$arg")"
+  done
+  tmux new-window -n "$(get_worktree_name)" "$cmd"
+else
+  exec claude "$@"
 fi
-
-[[ -n "${TMUX:-}" ]] || { echo "error: not inside a tmux session" >&2; exit 1; }
-
-[[ -z "$window_name" ]] && window_name="$(get_worktree_name)"
-
-cmd="claude"
-for arg in "${claude_args[@]+"${claude_args[@]}"}"; do
-  cmd="${cmd} $(printf '%q' "$arg")"
-done
-
-session=$(tmux display-message -p '#S' 2>/dev/null || true)
-tmux new-window -t "$session" -n "$window_name" -c "$PWD" bash -c "$cmd" || {
-  echo "error: tmux new-window failed; falling back to exec" >&2
-  exec claude "${claude_args[@]+"${claude_args[@]}"}"
-}

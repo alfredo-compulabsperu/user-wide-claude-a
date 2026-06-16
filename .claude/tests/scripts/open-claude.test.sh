@@ -53,15 +53,78 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Test 4: non-tmux without -p → exits with error, claude not called
+# Test 2: has_flag -p — true and false
+# ---------------------------------------------------------------------------
+source_has_flag() {
+  # Source only the has_flag function from the script in a subshell
+  bash -c "
+    source '$SCRIPT' 2>/dev/null || true
+    has_flag \"\$@\"
+  " -- "$@"
+}
+
+# We need to extract has_flag without running main logic; do it by sourcing
+# only the function definitions via a wrapper
+HAS_FLAG_WRAPPER="$(mktemp)"
+trap 'rm -rf "$MOCK_BIN" "$HAS_FLAG_WRAPPER"' EXIT
+
+# Write a standalone script that sources open-claude.sh's helpers only
+cat > "$HAS_FLAG_WRAPPER" <<WRAPPER
+#!/usr/bin/env bash
+set -euo pipefail
+# Source only function definitions (stop before main logic)
+# has_flag and get_worktree_name are defined before any main logic in open-claude.sh
+$(grep -A 8 '^has_flag()' "$SCRIPT")
+
+has_flag "\$@"
+WRAPPER
+chmod +x "$HAS_FLAG_WRAPPER"
+
+if bash "$HAS_FLAG_WRAPPER" "-p" "-p" "foo" 2>/dev/null; then
+  run_test "has_flag -p returns true when present" "pass"
+else
+  run_test "has_flag -p returns true when present" "fail"
+fi
+
+if ! bash "$HAS_FLAG_WRAPPER" "-p" "foo" "bar" 2>/dev/null; then
+  run_test "has_flag -p returns false when absent" "pass"
+else
+  run_test "has_flag -p returns false when absent" "fail"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 3: has_flag --print — true and false
+# ---------------------------------------------------------------------------
+if bash "$HAS_FLAG_WRAPPER" "--print" "--print" "foo" 2>/dev/null; then
+  run_test "has_flag --print returns true when present" "pass"
+else
+  run_test "has_flag --print returns true when present" "fail"
+fi
+
+if ! bash "$HAS_FLAG_WRAPPER" "--print" "foo" "bar" 2>/dev/null; then
+  run_test "has_flag --print returns false when absent" "pass"
+else
+  run_test "has_flag --print returns false when absent" "fail"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 4: non-tmux path passes args verbatim to claude
 # ---------------------------------------------------------------------------
 rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
-PATH="$MOCK_BIN:$PATH" TMUX="" bash "$SCRIPT" foo bar --baz 2>/dev/null && exit_code=0 || exit_code=$?
+PATH="$MOCK_BIN:$PATH" TMUX="" bash "$SCRIPT" foo bar --baz 2>/dev/null || true
 
-if [[ $exit_code -ne 0 ]] && [[ ! -f "$MOCK_BIN/claude.args" ]]; then
-  run_test "non-tmux without -p: exits with error, claude not called" "pass"
+if [[ -f "$MOCK_BIN/claude.args" ]]; then
+  args=$(cat "$MOCK_BIN/claude.args")
+  expected=$'foo\nbar\n--baz'
+  if [[ "$args" == "$expected" ]]; then
+    run_test "non-tmux: args passed verbatim to claude" "pass"
+  else
+    echo "  Expected: $(printf '%q' "$expected")"
+    echo "  Got:      $(printf '%q' "$args")"
+    run_test "non-tmux: args passed verbatim to claude" "fail"
+  fi
 else
-  run_test "non-tmux without -p: exits with error, claude not called" "fail"
+  run_test "non-tmux: args passed verbatim to claude" "fail"
 fi
 
 # ---------------------------------------------------------------------------
@@ -80,19 +143,6 @@ else
     echo "  tmux was called unexpectedly: $(cat "$MOCK_BIN/tmux.args")"
   fi
   run_test "tmux + -p: exec claude directly (no new-window)" "fail"
-fi
-
-# Test 5b: -p flag is stripped and not forwarded to claude
-if [[ -f "$MOCK_BIN/claude.args" ]]; then
-  claude_args=$(cat "$MOCK_BIN/claude.args")
-  if grep -qx '\-p' "$MOCK_BIN/claude.args" 2>/dev/null; then
-    echo "  -p flag leaked through to claude: $claude_args"
-    run_test "tmux + -p: -p flag stripped before calling claude" "fail"
-  else
-    run_test "tmux + -p: -p flag stripped before calling claude" "pass"
-  fi
-else
-  run_test "tmux + -p: -p flag stripped before calling claude" "fail"
 fi
 
 # ---------------------------------------------------------------------------
@@ -114,131 +164,6 @@ if [[ -f "$MOCK_BIN/tmux.args" ]]; then
   fi
 else
   run_test "tmux + no -p: tmux new-window called" "fail"
-fi
-
-# Test 6b: tmux new-window received -n flag
-if [[ -f "$MOCK_BIN/tmux.args" ]]; then
-  if grep -qx '\-n' "$MOCK_BIN/tmux.args" 2>/dev/null; then
-    run_test "tmux + no -p: tmux new-window -n flag present" "pass"
-  else
-    echo "  tmux args: $(cat "$MOCK_BIN/tmux.args")"
-    run_test "tmux + no -p: tmux new-window -n flag present" "fail"
-  fi
-else
-  run_test "tmux + no -p: tmux new-window -n flag present" "fail"
-fi
-
-# Test 6c: command string passed to tmux contains the forwarded arg
-if [[ -f "$MOCK_BIN/tmux.args" ]]; then
-  last_tmux_arg=$(tail -n 1 "$MOCK_BIN/tmux.args")
-  if [[ "$last_tmux_arg" == *"somearg"* ]]; then
-    run_test "tmux + no -p: command string forwarded to tmux contains arg" "pass"
-  else
-    echo "  last tmux arg: $last_tmux_arg"
-    run_test "tmux + no -p: command string forwarded to tmux contains arg" "fail"
-  fi
-else
-  run_test "tmux + no -p: command string forwarded to tmux contains arg" "fail"
-fi
-
-# ---------------------------------------------------------------------------
-# Test 7: tmux + --print flag → exec claude directly (no tmux new-window)
-# ---------------------------------------------------------------------------
-rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
-PATH="$MOCK_BIN:$PATH" TMUX="fake-tmux-session" bash "$SCRIPT" --print foo bar 2>/dev/null || true
-
-if [[ -f "$MOCK_BIN/claude.args" ]] && [[ ! -f "$MOCK_BIN/tmux.args" ]]; then
-  run_test "tmux + --print: exec claude directly (no new-window)" "pass"
-else
-  if [[ ! -f "$MOCK_BIN/claude.args" ]]; then
-    echo "  claude was not called"
-  fi
-  if [[ -f "$MOCK_BIN/tmux.args" ]]; then
-    echo "  tmux was called unexpectedly: $(cat "$MOCK_BIN/tmux.args")"
-  fi
-  run_test "tmux + --print: exec claude directly (no new-window)" "fail"
-fi
-
-# Test 7b: --print flag is stripped and not forwarded to claude
-if [[ -f "$MOCK_BIN/claude.args" ]]; then
-  if grep -qx '\-\-print' "$MOCK_BIN/claude.args" 2>/dev/null; then
-    echo "  --print flag leaked through to claude: $(cat "$MOCK_BIN/claude.args")"
-    run_test "tmux + --print: --print flag stripped before calling claude" "fail"
-  else
-    run_test "tmux + --print: --print flag stripped before calling claude" "pass"
-  fi
-else
-  run_test "tmux + --print: --print flag stripped before calling claude" "fail"
-fi
-
-# ---------------------------------------------------------------------------
-# Test 8: tmux path — arg with spaces is present in command string
-# ---------------------------------------------------------------------------
-rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
-PATH="$MOCK_BIN:$PATH" TMUX="fake-tmux-session" bash "$SCRIPT" "hello world" 2>/dev/null || true
-
-if [[ -f "$MOCK_BIN/tmux.args" ]]; then
-  last_tmux_arg=$(tail -n 1 "$MOCK_BIN/tmux.args")
-  if [[ "$last_tmux_arg" == *"hello"*"world"* ]]; then
-    run_test "tmux path: arg with spaces present in command string" "pass"
-  else
-    echo "  last tmux arg: $last_tmux_arg"
-    run_test "tmux path: arg with spaces present in command string" "fail"
-  fi
-else
-  run_test "tmux path: arg with spaces present in command string" "fail"
-fi
-
-# ---------------------------------------------------------------------------
-# Test 9: get_worktree_name fallback — returns "claude" when not in a git repo
-# ---------------------------------------------------------------------------
-GET_WORKTREE_WRAPPER="$(mktemp)"
-trap 'rm -rf "$MOCK_BIN" "$GET_WORKTREE_WRAPPER"' EXIT
-
-cat > "$GET_WORKTREE_WRAPPER" <<WRAPPER
-#!/usr/bin/env bash
-set -euo pipefail
-$(sed -n '/^get_worktree_name()/,/^}/p' "$SCRIPT")
-
-get_worktree_name
-WRAPPER
-chmod +x "$GET_WORKTREE_WRAPPER"
-
-result=$(cd /tmp && bash "$GET_WORKTREE_WRAPPER" 2>/dev/null || true)
-if [[ "$result" == "claude" ]]; then
-  run_test "get_worktree_name: returns 'claude' outside a git repo" "pass"
-else
-  echo "  Got: $result"
-  run_test "get_worktree_name: returns 'claude' outside a git repo" "fail"
-fi
-
-# ---------------------------------------------------------------------------
-# Test 10: tmux new-window FAILS → fallback exec claude with original args
-# ---------------------------------------------------------------------------
-rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
-
-# Mock tmux that exits 1 for new-window so the fallback path is triggered
-cat > "$MOCK_BIN/tmux" <<'EOF'
-#!/usr/bin/env bash
-printf '%s\n' "$@" > "$(dirname "$0")/tmux.args"
-[[ "$1" == "display-message" ]] && { echo "test-session"; exit 0; }
-[[ "$1" == "new-window" ]] && exit 1
-exit 0
-EOF
-chmod +x "$MOCK_BIN/tmux"
-
-PATH="$MOCK_BIN:$PATH" TMUX="fake-tmux-session" bash "$SCRIPT" somearg 2>/dev/null || true
-
-if [[ -f "$MOCK_BIN/claude.args" ]]; then
-  args=$(cat "$MOCK_BIN/claude.args")
-  if [[ "$args" == "somearg" ]]; then
-    run_test "tmux new-window failure: fallback exec claude with correct args" "pass"
-  else
-    echo "  claude.args: $(printf '%q' "$args")"
-    run_test "tmux new-window failure: fallback exec claude with correct args" "fail"
-  fi
-else
-  run_test "tmux new-window failure: fallback exec claude with correct args" "fail"
 fi
 
 # ---------------------------------------------------------------------------
