@@ -11,6 +11,7 @@ commands:
 agents: []
 
 scripts:
+  - name: gh-lib.sh
   - name: open-gh-issue.sh
     executable: true
   - name: open-gh-pr.sh
