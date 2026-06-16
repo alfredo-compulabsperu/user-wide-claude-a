@@ -55,26 +55,18 @@ fi
 # ---------------------------------------------------------------------------
 # Test 2: has_flag -p — true and false
 # ---------------------------------------------------------------------------
-source_has_flag() {
-  # Source only the has_flag function from the script in a subshell
-  bash -c "
-    source '$SCRIPT' 2>/dev/null || true
-    has_flag \"\$@\"
-  " -- "$@"
-}
 
 # We need to extract has_flag without running main logic; do it by sourcing
 # only the function definitions via a wrapper
 HAS_FLAG_WRAPPER="$(mktemp)"
 trap 'rm -rf "$MOCK_BIN" "$HAS_FLAG_WRAPPER"' EXIT
 
-# Write a standalone script that sources open-claude.sh's helpers only
+# Write a standalone script that sources open-claude.sh's helpers only.
+# Use sed to extract the has_flag function by its opening/closing braces.
 cat > "$HAS_FLAG_WRAPPER" <<WRAPPER
 #!/usr/bin/env bash
 set -euo pipefail
-# Source only function definitions (stop before main logic)
-# has_flag and get_worktree_name are defined before any main logic in open-claude.sh
-$(grep -A 8 '^has_flag()' "$SCRIPT")
+$(sed -n '/^has_flag()/,/^}/p' "$SCRIPT")
 
 has_flag "\$@"
 WRAPPER
@@ -145,6 +137,19 @@ else
   run_test "tmux + -p: exec claude directly (no new-window)" "fail"
 fi
 
+# Test 5b: -p flag is stripped and not forwarded to claude
+if [[ -f "$MOCK_BIN/claude.args" ]]; then
+  claude_args=$(cat "$MOCK_BIN/claude.args")
+  if grep -qx '\-p' "$MOCK_BIN/claude.args" 2>/dev/null; then
+    echo "  -p flag leaked through to claude: $claude_args"
+    run_test "tmux + -p: -p flag stripped before calling claude" "fail"
+  else
+    run_test "tmux + -p: -p flag stripped before calling claude" "pass"
+  fi
+else
+  run_test "tmux + -p: -p flag stripped before calling claude" "fail"
+fi
+
 # ---------------------------------------------------------------------------
 # Test 6: tmux + no -p → tmux new-window called with correct args
 # ---------------------------------------------------------------------------
@@ -164,6 +169,31 @@ if [[ -f "$MOCK_BIN/tmux.args" ]]; then
   fi
 else
   run_test "tmux + no -p: tmux new-window called" "fail"
+fi
+
+# Test 6b: tmux new-window received -n flag
+if [[ -f "$MOCK_BIN/tmux.args" ]]; then
+  if grep -qx '\-n' "$MOCK_BIN/tmux.args" 2>/dev/null; then
+    run_test "tmux + no -p: tmux new-window -n flag present" "pass"
+  else
+    echo "  tmux args: $(cat "$MOCK_BIN/tmux.args")"
+    run_test "tmux + no -p: tmux new-window -n flag present" "fail"
+  fi
+else
+  run_test "tmux + no -p: tmux new-window -n flag present" "fail"
+fi
+
+# Test 6c: command string passed to tmux contains the forwarded arg
+if [[ -f "$MOCK_BIN/tmux.args" ]]; then
+  last_tmux_arg=$(tail -n 1 "$MOCK_BIN/tmux.args")
+  if [[ "$last_tmux_arg" == *"somearg"* ]]; then
+    run_test "tmux + no -p: command string forwarded to tmux contains arg" "pass"
+  else
+    echo "  last tmux arg: $last_tmux_arg"
+    run_test "tmux + no -p: command string forwarded to tmux contains arg" "fail"
+  fi
+else
+  run_test "tmux + no -p: command string forwarded to tmux contains arg" "fail"
 fi
 
 # ---------------------------------------------------------------------------

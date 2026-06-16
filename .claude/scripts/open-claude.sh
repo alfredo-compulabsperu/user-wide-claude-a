@@ -32,6 +32,15 @@ get_worktree_name() {
   fi
 }
 
+# strip_passthrough_flags <args...>
+# Removes -p and --print from the argument list; prints remaining args one per line.
+strip_passthrough_flags() {
+  for arg in "$@"; do
+    [[ "$arg" == "-p" || "$arg" == "--print" ]] && continue
+    printf '%s\0' "$arg"
+  done
+}
+
 # Main logic
 if [[ -n "${TMUX:-}" ]] && ! has_flag "-p" "$@" && ! has_flag "--print" "$@"; then
   # Build a safely-quoted command string for tmux
@@ -41,5 +50,7 @@ if [[ -n "${TMUX:-}" ]] && ! has_flag "-p" "$@" && ! has_flag "--print" "$@"; th
   done
   tmux new-window -n "$(get_worktree_name)" "$cmd"
 else
-  exec claude "$@"
+  # Strip wrapper-only flags before handing off to claude
+  mapfile -d '' passthrough_args < <(strip_passthrough_flags "$@")
+  exec claude "${passthrough_args[@]}"
 fi
