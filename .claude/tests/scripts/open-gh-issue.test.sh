@@ -151,6 +151,21 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Test 9: gh search failure → non-zero exit
+# ---------------------------------------------------------------------------
+cat > "$MOCK_BIN/gh" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+chmod +x "$MOCK_BIN/gh"
+
+if ! PATH="$MOCK_BIN:$PATH" bash "$SCRIPT" broken query 2>/dev/null; then
+  run_test "gh search failure → error exit" "pass"
+else
+  run_test "gh search failure → error exit" "fail"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
