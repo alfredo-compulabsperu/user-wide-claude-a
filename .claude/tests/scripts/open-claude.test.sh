@@ -268,6 +268,33 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Test 10: tmux new-window FAILS → fallback exec claude with original args
+# ---------------------------------------------------------------------------
+rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
+
+# Mock tmux that exits 1 for new-window so the fallback path is triggered
+cat > "$MOCK_BIN/tmux" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$(dirname "$0")/tmux.args"
+[[ "$1" == "new-window" ]] && exit 1
+EOF
+chmod +x "$MOCK_BIN/tmux"
+
+PATH="$MOCK_BIN:$PATH" TMUX="fake-tmux-session" bash "$SCRIPT" somearg 2>/dev/null || true
+
+if [[ -f "$MOCK_BIN/claude.args" ]]; then
+  args=$(cat "$MOCK_BIN/claude.args")
+  if [[ "$args" == "somearg" ]]; then
+    run_test "tmux new-window failure: fallback exec claude with correct args" "pass"
+  else
+    echo "  claude.args: $(printf '%q' "$args")"
+    run_test "tmux new-window failure: fallback exec claude with correct args" "fail"
+  fi
+else
+  run_test "tmux new-window failure: fallback exec claude with correct args" "fail"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

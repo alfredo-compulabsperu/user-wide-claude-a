@@ -48,7 +48,7 @@ if [[ -n "${TMUX:-}" ]] && ! has_flag "-p" "$@" && ! has_flag "--print" "$@"; th
   for arg in "$@"; do
     cmd="${cmd} $(printf '%q' "$arg")"
   done
-  tmux new-window -n "$(get_worktree_name)" "$cmd" || {
+  tmux new-window -n "$(get_worktree_name)" bash -c "$cmd" || {
     echo "error: tmux new-window failed; falling back to exec" >&2
     mapfile -d '' passthrough_args < <(strip_passthrough_flags "$@")
     exec claude "${passthrough_args[@]}"
