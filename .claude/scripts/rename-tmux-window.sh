@@ -52,5 +52,7 @@ if [[ -n "$CONFLICT" ]]; then
   exit 1
 fi
 
-tmux rename-window -t "$CURRENT_ID" "$NAME"
+tmux rename-window -t "$CURRENT_ID" "$NAME" || {
+  echo "error: tmux rename-window failed for window ${CURRENT_ID}" >&2; exit 1
+}
 echo "Window ${CURRENT_ID} renamed to \"${NAME}\"."
