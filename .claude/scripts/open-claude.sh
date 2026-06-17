@@ -23,10 +23,11 @@ has_flag() {
 # get_worktree_name
 # Returns the basename of the git worktree root, falling back to "claude".
 get_worktree_name() {
-  local root
+  local root name
   root=$(git rev-parse --show-toplevel 2>/dev/null || true)
   if [[ -n "$root" ]]; then
-    basename "$root"
+    name=$(basename "$root")
+    echo "${name:-claude}"
   else
     echo "claude"
   fi
@@ -50,8 +51,7 @@ if [[ -n "${TMUX:-}" ]] && ! has_flag "-p" "$@" && ! has_flag "--print" "$@"; th
   done
   tmux new-window -n "$(get_worktree_name)" bash -c "$cmd" || {
     echo "error: tmux new-window failed; falling back to exec" >&2
-    mapfile -d '' passthrough_args < <(strip_passthrough_flags "$@")
-    exec claude "${passthrough_args[@]}"
+    exec claude "$@"
   }
 else
   # Strip wrapper-only flags before handing off to claude

@@ -42,10 +42,11 @@ else
 fi
 
 # Check for name conflict across all windows in this session
-_windows=$(tmux list-windows -F '#I #W') || {
+# Tab-delimited format avoids awk word-splitting on window names that contain spaces.
+_windows=$(tmux list-windows -F $'#I\t#W') || {
   echo "error: tmux list-windows failed" >&2; exit 1
 }
-CONFLICT=$(awk -v name="$NAME" -v cur="$CURRENT_ID" '$2 == name && $1 != cur {print $1}' <<< "$_windows")
+CONFLICT=$(awk -F'\t' -v name="$NAME" -v cur="$CURRENT_ID" '$2 == name && $1 != cur {print $1}' <<< "$_windows")
 
 if [[ -n "$CONFLICT" ]]; then
   echo "Error: window name \"${NAME}\" is already used by window ${CONFLICT}." >&2

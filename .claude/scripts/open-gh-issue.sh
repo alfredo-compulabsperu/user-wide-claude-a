@@ -57,6 +57,7 @@ for item in data:
 
   urls=()
   while IFS= read -r url; do
+    url="${url%$'\r'}"
     [[ -n "$url" ]] && urls+=("$url")
   done <<< "$parsed"
 

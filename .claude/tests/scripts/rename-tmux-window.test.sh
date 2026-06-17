@@ -42,14 +42,13 @@ EOF
 }
 
 make_mock_tmux() {
-  local window_list="${1:-0 main\n1 other}"
   rm -f "$MOCK_BIN/renamed_to"
-  cat > "$MOCK_BIN/tmux" <<EOF
+  cat > "$MOCK_BIN/tmux" <<'EOF'
 #!/usr/bin/env bash
-case "\$1" in
+case "$1" in
   display-message) echo "2" ;;
-  list-windows) printf '$window_list\n' ;;
-  rename-window) echo "\${@: -1}" > "\$(dirname "\$0")/renamed_to" ;;
+  list-windows) printf '0\tmain\n1\tother\n' ;;
+  rename-window) echo "${@: -1}" > "$(dirname "$0")/renamed_to" ;;
 esac
 EOF
   chmod +x "$MOCK_BIN/tmux"
@@ -91,7 +90,7 @@ fi
 # Test 4: explicit name → renamed to that name
 # ---------------------------------------------------------------------------
 make_mock_git "/repo/tools" "worktree-tools"
-make_mock_tmux "0 main\n1 other"
+make_mock_tmux
 PATH="$MOCK_BIN:$PATH" TMUX="fake" TMUX_PANE="%" bash "$SCRIPT" myname 2>/dev/null || true
 if [[ -f "$MOCK_BIN/renamed_to" ]] && [[ "$(cat "$MOCK_BIN/renamed_to")" == "myname" ]]; then
   run_test "explicit name → renamed to that name" "pass"
@@ -104,7 +103,7 @@ fi
 # Test 5: auto-compute — branch 'worktree-tools', folder 'tools' → name 'tools'
 # ---------------------------------------------------------------------------
 make_mock_git "/repo/tools" "worktree-tools"
-make_mock_tmux "0 main\n1 other"
+make_mock_tmux
 PATH="$MOCK_BIN:$PATH" TMUX="fake" TMUX_PANE="%" bash "$SCRIPT" 2>/dev/null || true
 if [[ -f "$MOCK_BIN/renamed_to" ]] && [[ "$(cat "$MOCK_BIN/renamed_to")" == "tools" ]]; then
   run_test "auto-compute: branch 'worktree-tools', folder 'tools' → name 'tools'" "pass"
@@ -117,7 +116,7 @@ fi
 # Test 6: auto-compute — branch 'main', folder 'tools' → folder fallback 'tools'
 # ---------------------------------------------------------------------------
 make_mock_git "/repo/tools" "main"
-make_mock_tmux "0 main\n1 other"
+make_mock_tmux
 PATH="$MOCK_BIN:$PATH" TMUX="fake" TMUX_PANE="%" bash "$SCRIPT" 2>/dev/null || true
 if [[ -f "$MOCK_BIN/renamed_to" ]] && [[ "$(cat "$MOCK_BIN/renamed_to")" == "tools" ]]; then
   run_test "auto-compute: branch 'main', folder 'tools' → folder fallback 'tools'" "pass"
@@ -135,7 +134,7 @@ cat > "$MOCK_BIN/tmux" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in
   display-message) echo "2" ;;
-  list-windows) printf '0 main\n1 tools\n2 current\n' ;;
+  list-windows) printf '0\tmain\n1\ttools\n2\tcurrent\n' ;;
   rename-window) echo "${@: -1}" > "$(dirname "$0")/renamed_to" ;;
 esac
 EOF
@@ -154,7 +153,7 @@ cat > "$MOCK_BIN/tmux" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in
   display-message) echo "2" ;;
-  list-windows) printf '0 main\n1 other\n' ;;
+  list-windows) printf '0\tmain\n1\tother\n' ;;
   rename-window) exit 1 ;;
 esac
 EOF
