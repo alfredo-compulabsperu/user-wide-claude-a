@@ -48,7 +48,7 @@ if not isinstance(data, list):
     print(f'unexpected gh response: {json.dumps(data)}', file=sys.stderr)
     sys.exit(1)
 for item in data:
-    print(item['url'])
+    print(item['url'].strip())
 ") || {
     echo "error: failed to parse gh output. raw response:" >&2
     printf '%s\n' "$raw" >&2
