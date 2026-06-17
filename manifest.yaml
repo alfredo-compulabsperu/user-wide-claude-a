@@ -1,14 +1,27 @@
 version: 1
 generated: "2026-06-13"  # Update manually or via generation tool
-idempotency: skip  # skip | overwrite | prompt — sync script default
+idempotency: prompt  # skip | overwrite | prompt — sync script default
 
 skills: []
 
-commands: []
+commands:
+  - name: open-claude.md
+  - name: open-gh-issue.md
+  - name: open-gh-pr.md
+  - name: rename-tmux-window.md
 
 agents: []
 
-scripts: []
+scripts:
+  - name: gh-lib.sh
+  - name: open-claude.sh
+    executable: true
+  - name: open-gh-issue.sh
+    executable: true
+  - name: open-gh-pr.sh
+    executable: true
+  - name: rename-tmux-window.sh
+    executable: true
 
 claude_md:
   portable: false
