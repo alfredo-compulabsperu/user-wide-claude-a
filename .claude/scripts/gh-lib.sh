@@ -26,8 +26,8 @@ open_urls() {
   local urls=("$@")
   for url in "${urls[@]}"; do echo "$url"; done
   if command -v xdg-open &>/dev/null; then
-    for url in "${urls[@]}"; do xdg-open "$url" &>/dev/null & done
+    for url in "${urls[@]}"; do xdg-open "$url" &>/dev/null & disown; done
   elif command -v open &>/dev/null; then
-    for url in "${urls[@]}"; do open "$url" &>/dev/null & done
+    for url in "${urls[@]}"; do open "$url" &>/dev/null & disown; done
   fi
 }

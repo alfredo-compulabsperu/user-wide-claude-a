@@ -197,6 +197,77 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Test 7: tmux + --print flag → exec claude directly (no tmux new-window)
+# ---------------------------------------------------------------------------
+rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
+PATH="$MOCK_BIN:$PATH" TMUX="fake-tmux-session" bash "$SCRIPT" --print foo bar 2>/dev/null || true
+
+if [[ -f "$MOCK_BIN/claude.args" ]] && [[ ! -f "$MOCK_BIN/tmux.args" ]]; then
+  run_test "tmux + --print: exec claude directly (no new-window)" "pass"
+else
+  if [[ ! -f "$MOCK_BIN/claude.args" ]]; then
+    echo "  claude was not called"
+  fi
+  if [[ -f "$MOCK_BIN/tmux.args" ]]; then
+    echo "  tmux was called unexpectedly: $(cat "$MOCK_BIN/tmux.args")"
+  fi
+  run_test "tmux + --print: exec claude directly (no new-window)" "fail"
+fi
+
+# Test 7b: --print flag is stripped and not forwarded to claude
+if [[ -f "$MOCK_BIN/claude.args" ]]; then
+  if grep -qx '\-\-print' "$MOCK_BIN/claude.args" 2>/dev/null; then
+    echo "  --print flag leaked through to claude: $(cat "$MOCK_BIN/claude.args")"
+    run_test "tmux + --print: --print flag stripped before calling claude" "fail"
+  else
+    run_test "tmux + --print: --print flag stripped before calling claude" "pass"
+  fi
+else
+  run_test "tmux + --print: --print flag stripped before calling claude" "fail"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 8: tmux path — arg with spaces is present in command string
+# ---------------------------------------------------------------------------
+rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
+PATH="$MOCK_BIN:$PATH" TMUX="fake-tmux-session" bash "$SCRIPT" "hello world" 2>/dev/null || true
+
+if [[ -f "$MOCK_BIN/tmux.args" ]]; then
+  last_tmux_arg=$(tail -n 1 "$MOCK_BIN/tmux.args")
+  if [[ "$last_tmux_arg" == *"hello"*"world"* ]]; then
+    run_test "tmux path: arg with spaces present in command string" "pass"
+  else
+    echo "  last tmux arg: $last_tmux_arg"
+    run_test "tmux path: arg with spaces present in command string" "fail"
+  fi
+else
+  run_test "tmux path: arg with spaces present in command string" "fail"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 9: get_worktree_name fallback — returns "claude" when not in a git repo
+# ---------------------------------------------------------------------------
+GET_WORKTREE_WRAPPER="$(mktemp)"
+trap 'rm -rf "$MOCK_BIN" "$HAS_FLAG_WRAPPER" "$GET_WORKTREE_WRAPPER"' EXIT
+
+cat > "$GET_WORKTREE_WRAPPER" <<WRAPPER
+#!/usr/bin/env bash
+set -euo pipefail
+$(sed -n '/^get_worktree_name()/,/^}/p' "$SCRIPT")
+
+get_worktree_name
+WRAPPER
+chmod +x "$GET_WORKTREE_WRAPPER"
+
+result=$(cd /tmp && bash "$GET_WORKTREE_WRAPPER" 2>/dev/null || true)
+if [[ "$result" == "claude" ]]; then
+  run_test "get_worktree_name: returns 'claude' outside a git repo" "pass"
+else
+  echo "  Got: $result"
+  run_test "get_worktree_name: returns 'claude' outside a git repo" "fail"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

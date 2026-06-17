@@ -31,10 +31,21 @@ fi
 
 # Get current window id — target $TMUX_PANE so subprocess invocations resolve the
 # correct window rather than the client's last-focused window.
-CURRENT_ID=$(tmux display-message -t "${TMUX_PANE:-}" -p '#I')
+if [[ -n "${TMUX_PANE:-}" ]]; then
+  CURRENT_ID=$(tmux display-message -t "$TMUX_PANE" -p '#I') || {
+    echo "error: could not determine current tmux window ID (stale TMUX_PANE?)" >&2; exit 1
+  }
+else
+  CURRENT_ID=$(tmux display-message -p '#I') || {
+    echo "error: could not determine current tmux window ID" >&2; exit 1
+  }
+fi
 
 # Check for name conflict across all windows in this session
-CONFLICT=$(tmux list-windows -F '#I #W' | awk -v name="$NAME" -v cur="$CURRENT_ID" '$2 == name && $1 != cur {print $1}')
+_windows=$(tmux list-windows -F '#I #W') || {
+  echo "error: tmux list-windows failed" >&2; exit 1
+}
+CONFLICT=$(awk -v name="$NAME" -v cur="$CURRENT_ID" '$2 == name && $1 != cur {print $1}' <<< "$_windows")
 
 if [[ -n "$CONFLICT" ]]; then
   echo "Error: window name \"${NAME}\" is already used by window ${CONFLICT}." >&2

@@ -36,7 +36,7 @@ else
   query="$*"
   query="${query#that }"
 
-  raw=$(gh search issues --repo "$repo_path" -- "$query" \
+  raw=$(gh search issues --repo "$repo_path" --state open -- "$query" \
         --json number,url --limit 20) || {
     echo "error: gh search failed for repo '$repo_path', query: $query" >&2; exit 1
   }
