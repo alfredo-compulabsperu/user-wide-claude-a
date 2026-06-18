@@ -14,3 +14,4 @@ whose file has been deleted or moved.
 | [plan-m7-claude-md-portability.plan.md](plan-m7-claude-md-portability.plan.md) | M7 — CLAUDE.md portability | in-progress |
 | [impl-loop-runbook.md](impl-loop-runbook.md) | Implementation loop runbook (sequential, fast mode) driving M2-M6 | complete |
 | [portability-loop-runbook.md](portability-loop-runbook.md) | Loop runbook (sequential, safe mode) for the same portability PRD | complete |
+| [token-optimizer.plan.md](token-optimizer.plan.md) | Two Claude commands that reduce per-turn token cost by disabling unused tools | draft |
