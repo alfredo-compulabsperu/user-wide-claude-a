@@ -1,0 +1,3 @@
+- MUST NOT use `CLAUDE_PROJECT_DIR` to locate the project root or find scripts.
+- MUST use relative paths (e.g. `bash ".claude/scripts/foo.sh"`) — Claude runs commands from the project root, so relative paths resolve correctly.
+- `CLAUDE_PROJECT_DIR` is substituted by Claude Code inline in command content, but it adds no value over a relative path and creates confusion about when/where it is available as a shell variable.

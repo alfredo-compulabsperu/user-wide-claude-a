@@ -5,7 +5,7 @@ model: claude-haiku-4-5-20251001
 ---
 
 ```bash
-bash "${HOME}/.claude/scripts/open-claude.sh" "$ARGUMENTS"
+bash ".claude/scripts/open-claude.sh" $ARGUMENTS
 ```
 
 Print the output verbatim.

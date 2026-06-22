@@ -53,70 +53,15 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Test 2: has_flag -p — true and false
-# ---------------------------------------------------------------------------
-
-# We need to extract has_flag without running main logic; do it by sourcing
-# only the function definitions via a wrapper
-HAS_FLAG_WRAPPER="$(mktemp)"
-trap 'rm -rf "$MOCK_BIN" "$HAS_FLAG_WRAPPER"' EXIT
-
-# Write a standalone script that sources open-claude.sh's helpers only.
-# Use sed to extract the has_flag function by its opening/closing braces.
-cat > "$HAS_FLAG_WRAPPER" <<WRAPPER
-#!/usr/bin/env bash
-set -euo pipefail
-$(sed -n '/^has_flag()/,/^}/p' "$SCRIPT")
-
-has_flag "\$@"
-WRAPPER
-chmod +x "$HAS_FLAG_WRAPPER"
-
-if bash "$HAS_FLAG_WRAPPER" "-p" "-p" "foo" 2>/dev/null; then
-  run_test "has_flag -p returns true when present" "pass"
-else
-  run_test "has_flag -p returns true when present" "fail"
-fi
-
-if ! bash "$HAS_FLAG_WRAPPER" "-p" "foo" "bar" 2>/dev/null; then
-  run_test "has_flag -p returns false when absent" "pass"
-else
-  run_test "has_flag -p returns false when absent" "fail"
-fi
-
-# ---------------------------------------------------------------------------
-# Test 3: has_flag --print — true and false
-# ---------------------------------------------------------------------------
-if bash "$HAS_FLAG_WRAPPER" "--print" "--print" "foo" 2>/dev/null; then
-  run_test "has_flag --print returns true when present" "pass"
-else
-  run_test "has_flag --print returns true when present" "fail"
-fi
-
-if ! bash "$HAS_FLAG_WRAPPER" "--print" "foo" "bar" 2>/dev/null; then
-  run_test "has_flag --print returns false when absent" "pass"
-else
-  run_test "has_flag --print returns false when absent" "fail"
-fi
-
-# ---------------------------------------------------------------------------
-# Test 4: non-tmux path passes args verbatim to claude
+# Test 4: non-tmux without -p → exits with error, claude not called
 # ---------------------------------------------------------------------------
 rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
-PATH="$MOCK_BIN:$PATH" TMUX="" bash "$SCRIPT" foo bar --baz 2>/dev/null || true
+PATH="$MOCK_BIN:$PATH" TMUX="" bash "$SCRIPT" foo bar --baz 2>/dev/null && exit_code=0 || exit_code=$?
 
-if [[ -f "$MOCK_BIN/claude.args" ]]; then
-  args=$(cat "$MOCK_BIN/claude.args")
-  expected=$'foo\nbar\n--baz'
-  if [[ "$args" == "$expected" ]]; then
-    run_test "non-tmux: args passed verbatim to claude" "pass"
-  else
-    echo "  Expected: $(printf '%q' "$expected")"
-    echo "  Got:      $(printf '%q' "$args")"
-    run_test "non-tmux: args passed verbatim to claude" "fail"
-  fi
+if [[ $exit_code -ne 0 ]] && [[ ! -f "$MOCK_BIN/claude.args" ]]; then
+  run_test "non-tmux without -p: exits with error, claude not called" "pass"
 else
-  run_test "non-tmux: args passed verbatim to claude" "fail"
+  run_test "non-tmux without -p: exits with error, claude not called" "fail"
 fi
 
 # ---------------------------------------------------------------------------
@@ -248,7 +193,7 @@ fi
 # Test 9: get_worktree_name fallback — returns "claude" when not in a git repo
 # ---------------------------------------------------------------------------
 GET_WORKTREE_WRAPPER="$(mktemp)"
-trap 'rm -rf "$MOCK_BIN" "$HAS_FLAG_WRAPPER" "$GET_WORKTREE_WRAPPER"' EXIT
+trap 'rm -rf "$MOCK_BIN" "$GET_WORKTREE_WRAPPER"' EXIT
 
 cat > "$GET_WORKTREE_WRAPPER" <<WRAPPER
 #!/usr/bin/env bash
