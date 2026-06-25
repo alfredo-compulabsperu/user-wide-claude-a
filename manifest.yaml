@@ -2,7 +2,7 @@ version: 1
 generated: '2026-06-13'
 idempotency: prompt
 skills:
-- name: audit-plan
+- name: review-plan
 commands:
 - name: open-claude.md
 - name: open-gh-issue.md

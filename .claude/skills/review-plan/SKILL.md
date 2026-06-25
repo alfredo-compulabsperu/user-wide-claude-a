@@ -1,37 +1,51 @@
 ---
-name: audit-plan
-description: Audits any plan against 8 domain-agnostic structural axes — preconditions, interface contracts, dependency graph, null/error paths, environment assumptions, ownership, verification, and reversibility/blast-radius — plus optional harness axes for agent orchestration and optional security/sensitivity axes for plans touching data, money, or credentials. Works for any domain: software, ops, process, agent pipelines, runbooks. Invoke as /audit-plan <file> or /audit-plan to infer from context. Add --assess for a GO/HOLD/NO-GO verdict with confidence and rationale. Add --loop for the full closed-loop: audit + assess → user fixes → isolated re-audit → final verdict. Use whenever the user wants to review, audit, validate, stress-test, or find gaps in a plan — especially before launching or executing it — even if they don't say "audit".
+name: review-plan
+description: "Reviews any plan before execution: audits it against 8 domain-agnostic structural axes — preconditions, interface contracts, dependency graph, null/error paths, environment assumptions, ownership, verification, and reversibility/blast-radius — then assesses the findings into a GO/HOLD/NO-GO verdict with confidence. Optional harness axes for agent orchestration and sensitivity axes for plans touching data, money, or credentials auto-enable when detected. Works for any domain: software, ops, process, agent pipelines, runbooks. Invoke as /review-plan <file> or /review-plan to infer from context. Add --loop for a closed-loop with an isolated cold-start re-audit, or --adversarial for a first-principles attack on unknown unknowns. Use whenever the user wants to review, audit, assess, validate, stress-test, or find gaps in a plan — especially before launching or executing it — even if they don't say \"review\"."
 ---
 
-# audit-plan
+# review-plan
 
-Audit a plan against a minimal set of domain-agnostic axes before execution begins.
+Review a plan before execution. A review is two halves: an **audit** (findings against domain-agnostic axes) and an **assessment** (those findings mapped to a GO/HOLD/NO-GO verdict). Always produce both — the verdict is the question the user came with ("can I run this?"); findings without a verdict make the user do the judgment the skill is best positioned to make.
 
 ## Input
 
-- **File argument** — path to a plan file. Read it before auditing.
+- **File argument** — path to a plan file. Read it before reviewing.
 - **No argument** — infer the plan from conversation context (most recently discussed plan, inline text). If none is evident, ask the user to paste it.
-- **`--harness` flag** — force-enable harness-specific axes.
-- **`--no-harness` flag** — suppress harness axes even if auto-detected.
-- **`--sensitivity` flag** — force-enable security/sensitivity axes.
-- **`--no-sensitivity` flag** — suppress sensitivity axes even if auto-detected.
-- **`--assess` flag** — after the audit, produce a GO / HOLD / NO-GO verdict with confidence and rationale grounded in the findings.
-- **`--loop` flag** — full closed-loop: audit + assess → user fixes → isolated re-audit → final assess. See Loop Mode below.
-- **`--adversarial` flag** — after the audit, spawn a fresh isolated agent with no axes and no prior findings. It tries to break the plan from first principles. Results labeled separately as unverified. Combinable with `--assess` and `--loop`.
+- **Acceptance criteria (optional)** — success definition, constraints, risk tolerance. If absent, see "Reviewing without criteria" below.
+
+Two opt-in modes:
+
+- **`--loop`** — closed-loop: review → user fixes → isolated cold-start re-audit → final verdict. See Loop Mode.
+- **`--adversarial`** — after the audit, spawn an isolated agent to attack the plan from first principles with no axes or prior findings. Targets unknown unknowns. Combinable with `--loop`.
+
+Harness and sensitivity axes auto-enable on detection (see below) — no flag needed. To force a group on when detection misses it, say so (`--harness` / `--sensitivity` are honored as overrides).
 
 ## Auto-detection
 
 Scan the plan for two kinds of signal before auditing. Enable the matching optional axis group and tell the user which fired.
 
-**Harness signals** → enable harness axes, say "Harness axes enabled (detected: <signal>)."
-`agent`, `pipeline()`, `parallel()`, `workflow`, `isolated`, `stage`, `orchestrat`, numbered stages with agent names, return contracts (SUCCESS/WARN/ERROR), concurrent execution language.
+**Harness signals** — any language indicating steps execute in separate processes or are coordinated by an orchestrator → enable harness axes, say "Harness axes enabled (detected: <signal>)."
+Keywords: `agent`, `pipeline()`, `parallel()`, `workflow`, `isolated`, `stage`, `orchestrat`, numbered stages with agent names, return contracts (SUCCESS/WARN/ERROR), concurrent execution language.
 
-**Sensitivity signals** → enable security/sensitivity axes, say "Sensitivity axes enabled (detected: <signal>)."
-`PII`, `personal data`, `email`, `address`, `credential`, `secret`, `token`, `password`, `API key`, `payment`, `card`, `bank`, `health`, `medical`, `patient`, `customer data`, regulated-domain language (HIPAA, GDPR, PCI), or any step exporting/logging/transmitting user data.
+**Sensitivity signals** — any language indicating the plan handles protected, regulated, or personal data → enable sensitivity axes, say "Sensitivity axes enabled (detected: <signal>)."
+Keywords: `PII`, `personal data`, `email`, `address`, `credential`, `secret`, `token`, `password`, `API key`, `payment`, `card`, `bank`, `health`, `medical`, `patient`, `customer data`, regulated-domain language (HIPAA, GDPR, PCI), or any step exporting/logging/transmitting user data.
+A missed sensitivity axis is High-severity by this skill's own scale, so **err toward enabling**: fire on oblique data-movement language too (export, back up, send to, share with, copy to, hand off) even when no keyword above appears. A loud "enabled (detected: 'export the file')" is cheap; a silent miss is not.
 
 ---
 
-## The 7 Core Axes
+## Reviewing without criteria
+
+The 8 core axes are domain-agnostic — a missing rollback is a gap regardless of the plan's goal — so a review never blocks on missing acceptance criteria. When the user gives no success definition, constraints, or risk tolerance:
+
+1. **Infer and state** — derive implied criteria from the plan's stated goal, list them as explicit assumptions, and review against those. Let the user correct.
+2. **Audit structure regardless** — run all axes; the only one that genuinely needs a success definition is Verification (axis 7), so tag its findings `(speculative)` when "success" is undefined.
+3. **Lower verdict confidence** — an inferred bar means a guessed GO/HOLD/NO-GO threshold; reflect that in the Assessment confidence score.
+
+If the user is present and the stakes are high, prefer just asking for criteria first.
+
+---
+
+## The 8 Core Axes
 
 Apply to every plan. Each axis has a question and a set of things to look for.
 
@@ -175,9 +189,10 @@ Is access scoped to least privilege, and does the plan respect regulatory limits
 
 | Severity | Meaning |
 |---|---|
-| **Critical** | Will stall, corrupt output, or produce wrong results on first run |
-| **High** | Silent failure, data loss, or degraded output with no detection |
-| **Medium** | Operational gap — won't break first run but creates reliability or maintenance risk |
+| **Critical** | Failure is visible on first run — plan stalls, errors out, or produces obviously wrong output |
+| **High** | Failure is silent — plan runs to completion but loses data, produces wrong results, or creates an undetected security exposure |
+| **Medium** | A real gap that is recoverable or detectable through monitoring or user complaint; does not break the first run |
+| **Low** | Cosmetic or hardening nit — worth noting, costs nothing to ignore on this run |
 
 ### Calibration — resist inflation
 
@@ -186,27 +201,22 @@ Severity is the whole product. A finding rated one level too high teaches the us
 Calibrate against the consequence, not the topic:
 
 - **Critical vs High** — Critical breaks visibly on the first run (halts, wrong output, can't execute). High runs but fails silently or later (data lost or corrupted, no detection).
-- **High vs Medium** — High = an undetected bad outcome (lost data, wrong result, unalarmed security exposure). Medium = a real gap that is recoverable, detectable, or cosmetic to correctness. "Could be tightened" is Medium; "will silently hurt and no one will know" is High.
-- **Medium vs PASS** — If the plan already handles it, mark PASS. Never log a finding just to fill the table.
+- **High vs Medium** — High = an undetected bad outcome (lost data, wrong result, unalarmed security exposure). Medium = a real gap that is recoverable or detectable. "Could be tightened" is Medium; "will silently hurt and no one will know" is High.
+- **Medium vs Low** — Medium is a gap that will plausibly cost someone time or correctness if unaddressed. Low is a nit that is fine to ship as-is — note it once, do not dwell.
+- **Below Low vs PASS** — If the plan already handles it, mark PASS. Never log a finding just to fill the table.
 
 When torn between two levels, pick the lower and name the condition that would raise it in the Rationale. A well-formed plan yielding zero Critical and few High findings is a correct audit, not a weak one.
 
-## Confidence
+Severity rates **consequence**. The Adversarial and Harness tables rate **likelihood** (High/Medium/Low) — a separate dimension. Do not merge the two scales: in Phase 3 synthesis, keep adversarial findings on their own likelihood scale rather than forcing them into a consequence tier.
 
-Plan audit findings are structural observations — a gap either exists in the plan text or it does not. Confidence level is therefore NOT a standard column; severity already encodes impact.
-
-The one exception: **speculative findings** — where the plan is ambiguous and the finding depends on an assumption you cannot verify from the text alone. In that case:
-
-- Tag the finding `(speculative)` in the Finding column
-- State the condition explicitly in Rationale: "only a problem if X is true"
-- Do not assign Critical severity to a speculative finding
+**Speculative findings:** When a finding depends on runtime conditions not visible in the plan text, tag it `(speculative)` in the Finding column and state the condition in Rationale ("only a problem if X is true"). Do not assign Critical to a speculative finding.
 
 ---
 
 ## Output Format
 
 ```
-## Plan Audit: <plan name or inferred title>
+## Plan Review: <plan name or inferred title>
 
 **Axes applied:** Core (8) [+ Harness (5)] [+ Sensitivity (3)]
 
@@ -224,6 +234,11 @@ The one exception: **speculative findings** — where the plan is ambiguous and 
 |------|---------|-----------|---------------|
 
 ### Medium
+
+| Axis | Finding | Rationale | Recommendation |
+|------|---------|-----------|---------------|
+
+### Low
 
 | Axis | Finding | Rationale | Recommendation |
 |------|---------|-----------|---------------|
@@ -254,11 +269,21 @@ The one exception: **speculative findings** — where the plan is ambiguous and 
 
 One finding per row. If an axis has no issues, mark PASS and move on. Do not pad.
 
+**Ground every finding in the plan.** The Finding column must point to a specific step, line, or quoted phrase that actually appears in the plan — name it ("Step 4", "the `parallel([a,b,c])` call", "the line 'email the export to finance'"). Do not raise findings about steps the plan does not contain; an audit's credibility dies the first time it flags something that isn't there. If a gap is an *omission* (the plan should do X but doesn't), say what the plan does instead and where the omission bites. When two axes describe the same defect, log it once under the most specific axis and mark the other PASS — double-counting inflates the totals the verdict depends on.
+
 ---
 
-## Assessment Output (--assess or --loop)
+## Assessment (always produced)
 
-Appended after the audit findings. Assessment is a probabilistic judgment — confidence belongs here, not in the audit table.
+The second half of every review. Appended after the audit findings — a review is incomplete without it. Assessment is a probabilistic judgment, so confidence belongs here, not in the audit table.
+
+Map findings to a verdict with this default rule, then adjust only with a stated reason:
+
+- **NO-GO** — one or more unresolved **Critical** findings. The plan will break or corrupt on first run.
+- **HOLD** — no Critical, but one or more unresolved **High** findings. The plan runs but risks silent data loss or wrong results; resolve or consciously accept each High first.
+- **GO** — only Medium/Low findings remain. Safe to execute; address the Mediums as conditions where practical.
+
+The rule is a floor, not a ceiling: you may downgrade GO→HOLD when several Mediums compound into a likely-bad outcome, or note why a lone High is acceptable for this run — but state the reason in Rationale whenever you depart from the default.
 
 ```
 ## Assessment
@@ -335,6 +360,8 @@ Wait for the user to reply before proceeding.
 
 ### Phase 2 — Isolated Re-audit (fresh agent, written output only)
 
+An audit is only as valid as the independence of the auditor. The re-audit agent must derive its findings fresh — seeing Phase 1 results would anchor its judgment and defeat the loop's purpose.
+
 Spawn an isolated agent with **only** these inputs — nothing else:
 
 1. The updated plan file (read fresh from disk)
@@ -368,15 +395,4 @@ Produce a final assessment with updated verdict and confidence.
 
 ### Loop + Adversarial
 
-When `--loop --adversarial` are combined, Phase 2 spawns two agents in parallel:
-
-1. **Structured re-audit agent** — axes only, no Phase 1 findings (same as standard loop)
-2. **Adversarial agent** — plan only, no axes, no findings (same as standalone `--adversarial`)
-
-Phase 3 synthesizes all three finding sets: Phase 1 audit, Phase 2 re-audit, adversarial.
-
----
-
-### Loop exit conditions
-
-Stop after Phase 3. Do not loop again unless the user explicitly requests another cycle. If Final Verdict is still NO-GO after one loop, tell the user: "Plan requires redesign before another audit cycle is useful."
+When `--loop --adversarial` are combined, Phase 2 spawns the structured re-audit agent and the adversarial agent in parallel. Phase 3 synthesizes all three finding sets: Phase 1 audit, Phase 2 re-audit, adversarial. If Final Verdict is still NO-GO, tell the user: "Plan requires redesign before another audit cycle is useful."
