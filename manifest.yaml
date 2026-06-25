@@ -2,7 +2,8 @@ version: 1
 generated: "2026-06-13"  # Update manually or via generation tool
 idempotency: prompt  # skip | overwrite | prompt — sync script default
 
-skills: []
+skills:
+  - name: optimize-plan
 
 commands:
   - name: open-claude.md

@@ -1,0 +1,29 @@
+{
+  "skill_name": "optimize-plan",
+  "evals": [
+    {
+      "id": 0,
+      "name": "research-pipeline-isolation-parallel",
+      "prompt": "before I kick this off, can you make it lighter on context and faster to run? it does a ton of web research and review-reading one step at a time and my main chat always ends up bloated. plan is at SCRATCH/fixtures/competitor-research-pipeline.plan.md",
+      "expected_output": "An optimization report that (a) flags the 5 serial competitor-research steps and the G2/Capterra review step as context-isolation candidates (delegate to isolated subagents returning compact results), (b) proposes parallelizing the 5 independent research steps with a fan-in before the scoring step, (c) catches the duplicate read of docs/our-product-onepager.md (Steps 7 and 10), (d) preserves the Pre-flight/Phase/Step schema, (e) delivers diff-first without writing the file.",
+      "files": ["SCRATCH/fixtures/competitor-research-pipeline.plan.md"],
+      "assertions": []
+    },
+    {
+      "id": 1,
+      "name": "deploy-runbook-dedup-tools",
+      "prompt": "/optimize-plan SCRATCH/fixtures/deploy-runbook.md — feels like it re-reads the same config a bunch and leans on cat/grep, and I think the ordering wastes time. tighten it up",
+      "expected_output": "An optimization report that (a) flags the values.yaml file being read 3-4 times (Steps 2,4,6,7) as dedup, (b) flags the costly 9-min build (Step 1) running before the cheap tag-format validation (Step 3) as a fail-fast ordering win, (c) flags cat/grep and the full rendered-manifest / 2000-line log reads as tool-efficiency / isolation candidates, (d) preserves the runbook schema, (e) does NOT propose unsafe reordering that breaks dependencies (e.g. pushing before building), (f) delivers diff-first.",
+      "files": ["SCRATCH/fixtures/deploy-runbook.md"],
+      "assertions": []
+    },
+    {
+      "id": 2,
+      "name": "lean-plan-calibration-chaining",
+      "prompt": "optimize this plan for me: SCRATCH/fixtures/add-rate-limit.plan.md",
+      "expected_output": "An honest, calibrated report: the plan is already fairly lean, so few or zero strong findings — it should NOT manufacture isolation/parallelization wins. It should note the under-specified interface (Step 3 mentions 'the store' / window state but Step 1 defines the Redis backing — an undefined contract) and recommend running /audit-plan first rather than optimizing around the gap. Must not pad the findings table.",
+      "files": ["SCRATCH/fixtures/add-rate-limit.plan.md"],
+      "assertions": []
+    }
+  ]
+}
