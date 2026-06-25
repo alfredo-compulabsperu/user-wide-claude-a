@@ -165,6 +165,25 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Test 9: display-message failure → error exit
+# ---------------------------------------------------------------------------
+make_mock_git "/repo/tools" "worktree-tools"
+cat > "$MOCK_BIN/tmux" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  display-message) exit 1 ;;
+  *) exit 0 ;;
+esac
+EOF
+chmod +x "$MOCK_BIN/tmux"
+
+if ! PATH="$MOCK_BIN:$PATH" TMUX="fake" TMUX_PANE="%" bash "$SCRIPT" myname 2>/dev/null; then
+  run_test "display-message failure → error exit" "pass"
+else
+  run_test "display-message failure → error exit" "fail"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

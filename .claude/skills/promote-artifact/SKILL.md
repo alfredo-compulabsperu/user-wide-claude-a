@@ -55,7 +55,7 @@ Run `/validate-artifact <path>`:
 Resolve repo root via `$CLAUDE_PROJECT_DIR` env var (primary) or `git rev-parse --show-toplevel` (fallback).
 
 ```
-repo dest:  <repo_root>/<type>s/<artifact-name>
+repo dest:  <repo_root>/.claude/<type>s/<artifact-name>
 local dest: $HOME/.claude/<type>s/<artifact-name>
 ```
 
@@ -107,7 +107,7 @@ Print:
 ```
 Promoted: <artifact-name>
 Type:     <type>
-Repo:     <type>s/<artifact-name>/
+Repo:     .claude/<type>s/<artifact-name>/
 Local:    ~/.claude/<type>s/<artifact-name>/
 Manifest: updated | already listed
 
@@ -137,7 +137,7 @@ git pull --ff-only origin main || { echo "ERROR: local main is behind remote —
 ```bash
 BRANCH="promote/<type>/<artifact-name>"
 git checkout -b "$BRANCH"
-git add <type>s/<artifact-name> manifest.yaml
+git add .claude/<type>s/<artifact-name> manifest.yaml
 git commit -m "promote(<type>): <artifact-name>"
 git push -u origin "$BRANCH"
 ```
@@ -187,6 +187,6 @@ Type:     <type>
 Branch:   promote/<type>/<artifact-name> (deleted)
 PR:       #N — <pr-url>
 Local:    ~/.claude/<type>s/<artifact-name>/ ✓
-Repo:     <type>s/<artifact-name>/ (on main) ✓
+Repo:     .claude/<type>s/<artifact-name>/ (on main) ✓
 Manifest: updated ✓
 ```
