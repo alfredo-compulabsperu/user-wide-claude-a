@@ -25,7 +25,9 @@ Validates `<path>` against three criteria. Called standalone or by `/promote-art
 
 ## Step 1 — Repo-agnostic (static grep)
 
-Run each grep against `<path>` (use `-rn` for directories, `-n` for files):
+For skill directories, exclude `evals/` from all checks — evals are project-local development scaffolding, not part of the distributable artifact.
+
+Run each grep against `<path>` (use `-rn --exclude-dir=evals` for directories, `-n` for files):
 
 ```bash
 grep -rn  "/home/"          <path>          # validate-artifact: ignore-line

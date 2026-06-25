@@ -63,9 +63,11 @@ For commands, preserve subdirectory structure (e.g. `archived/` prefix) if prese
 
 ## Step 4 — Copy to repo and local
 
+For skill directories, exclude `evals/` — evals are project-local development scaffolding and must not be distributed.
+
 For each destination (repo, then local):
 
-1. If dest does not exist → copy (`cp -rp` for dirs, `cp -p` for files). Report `[INSTALLED]`.
+1. If dest does not exist → copy (`rsync -a --exclude=evals/` for skill dirs, `cp -p` for files). Report `[INSTALLED]`.
 2. If dest exists and SHA-256 matches → skip. Report `[OK]`.
 3. If dest exists and SHA-256 differs:
    - `--force` → overwrite. Report `[UPDATED]`.
