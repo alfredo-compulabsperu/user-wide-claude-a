@@ -20,7 +20,9 @@ bash -n sync.sh   # syntax check
 
 No package install step. No build step.
 
-## Available Commands
+## Scripts
+
+For full flag reference: `bash sync.sh --help`
 
 <!-- AUTO-GENERATED: from sync.sh usage() -->
 | Command | Description |
@@ -28,14 +30,14 @@ No package install step. No build step.
 | `bash sync.sh` | Install all artifacts from repo to `~/.claude/` |
 | `bash sync.sh --dry-run` | Report missing/stale/local-only artifacts without modifying `~/.claude/` |
 | `bash sync.sh --force` | Overwrite existing files even when SHA-256 differs (no prompt) |
-| `bash sync.sh -h` | Show help |
 <!-- END AUTO-GENERATED -->
 
-## Skills
+## Slash Commands
 
-<!-- AUTO-GENERATED: from skills/ -->
+<!-- AUTO-GENERATED: from commands/ and skills/ -->
 | Trigger | Description |
 |---------|-------------|
+| `/vm-health` | Run VM health checks (disk, CPU, memory); prints verbatim output from `vm-health.sh` |
 | `/validate-artifact <path>` | Validate an artifact for portability, dependency completeness, and terseness |
 | `/promote-artifact <path> [--type] [--force] [--git]` | Validate and install artifact locally and into the repo; `--git` runs full PR pipeline |
 <!-- END AUTO-GENERATED -->
@@ -47,13 +49,13 @@ No automated test suite. Validation steps:
 ```bash
 python3 -c "import yaml; yaml.safe_load(open('manifest.yaml')); print('manifest: OK')"
 bash -n sync.sh && echo "sync.sh: OK"
-ls skills/validate-artifact/SKILL.md && echo "validate-artifact: OK"
-ls skills/promote-artifact/SKILL.md && echo "promote-artifact: OK"
+ls .claude/skills/validate-artifact/SKILL.md && echo "validate-artifact: OK"
+ls .claude/skills/promote-artifact/SKILL.md && echo "promote-artifact: OK"
 ```
 
 ## Adding a New Artifact
 
-1. Place the artifact under the correct directory (`skills/`, `commands/`, `agents/`, `scripts/`).
+1. Place the artifact under the correct directory (`.claude/skills/`, `.claude/commands/`, `.claude/agents/`, `.claude/scripts/`).
 2. Run `/promote-artifact <path>` (or `/promote-artifact <path> --git` to open a PR).
 3. The skill updates `manifest.yaml` automatically.
 
