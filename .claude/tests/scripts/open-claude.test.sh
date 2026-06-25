@@ -221,7 +221,9 @@ rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
 cat > "$MOCK_BIN/tmux" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$@" > "$(dirname "$0")/tmux.args"
+[[ "$1" == "display-message" ]] && { echo "test-session"; exit 0; }
 [[ "$1" == "new-window" ]] && exit 1
+exit 0
 EOF
 chmod +x "$MOCK_BIN/tmux"
 

@@ -23,7 +23,7 @@ claude_args=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -w) shift; window_name="${1:-}"; claude_args+=("-w" "${1:-}"); shift ;;
+    -w) shift; window_name="${1:-}"; claude_args+=("-w" "${window_name}"); shift ;;
     -p|--print) passthrough=true; shift ;;
     *) claude_args+=("$1"); shift ;;
   esac
@@ -42,7 +42,8 @@ for arg in "${claude_args[@]+"${claude_args[@]}"}"; do
   cmd="${cmd} $(printf '%q' "$arg")"
 done
 
-tmux new-window -n "$window_name" -c "$PWD" bash -c "$cmd" || {
+session=$(tmux display-message -p '#S' 2>/dev/null || true)
+tmux new-window -t "$session" -n "$window_name" -c "$PWD" bash -c "$cmd" || {
   echo "error: tmux new-window failed; falling back to exec" >&2
   exec claude "${claude_args[@]+"${claude_args[@]}"}"
 }
