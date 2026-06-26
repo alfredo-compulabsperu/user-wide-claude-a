@@ -295,6 +295,109 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Test 11: -w flag sets tmux window name
+# ---------------------------------------------------------------------------
+rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
+
+# Reset mock tmux to success (Test 10 left a failing mock)
+cat > "$MOCK_BIN/tmux" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$(dirname "$0")/tmux.args"
+EOF
+chmod +x "$MOCK_BIN/tmux"
+
+PATH="$MOCK_BIN:$PATH" TMUX="fake-tmux-session" bash "$SCRIPT" -w custwin somearg 2>/dev/null || true
+
+if [[ -f "$MOCK_BIN/tmux.args" ]]; then
+  window_name=$(awk '/^-n$/{getline; print; exit}' "$MOCK_BIN/tmux.args")
+  if [[ "$window_name" == "custwin" ]]; then
+    run_test "-w: tmux new-window uses -w value as window name" "pass"
+  else
+    echo "  Expected window name: custwin, got: $(printf '%q' "$window_name")"
+    echo "  tmux args: $(cat "$MOCK_BIN/tmux.args")"
+    run_test "-w: tmux new-window uses -w value as window name" "fail"
+  fi
+else
+  echo "  tmux was not called"
+  run_test "-w: tmux new-window uses -w value as window name" "fail"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 12: -w flag and its value are stripped from the claude command string
+# ---------------------------------------------------------------------------
+if [[ -f "$MOCK_BIN/tmux.args" ]]; then
+  cmd_line=$(awk '/^-c$/{getline; print; exit}' "$MOCK_BIN/tmux.args")
+  if [[ " $cmd_line " == *" -w "* ]] || [[ " $cmd_line " == *" custwin "* ]] || [[ "$cmd_line" == *" custwin" ]]; then
+    echo "  -w or value leaked into claude cmd: $cmd_line"
+    run_test "-w: -w and value stripped from claude command" "fail"
+  else
+    run_test "-w: -w and value stripped from claude command" "pass"
+  fi
+else
+  run_test "-w: -w and value stripped from claude command" "fail"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 13: non-tmux path — -w and its value stripped before calling claude
+# ---------------------------------------------------------------------------
+rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
+PATH="$MOCK_BIN:$PATH" TMUX="" bash "$SCRIPT" -w mywin foo bar 2>/dev/null || true
+
+if [[ -f "$MOCK_BIN/claude.args" ]]; then
+  if grep -qx '\-w' "$MOCK_BIN/claude.args" 2>/dev/null || grep -qx 'mywin' "$MOCK_BIN/claude.args" 2>/dev/null; then
+    echo "  -w or value leaked to claude: $(cat "$MOCK_BIN/claude.args")"
+    run_test "non-tmux: -w and value stripped before calling claude" "fail"
+  else
+    run_test "non-tmux: -w and value stripped before calling claude" "pass"
+  fi
+else
+  run_test "non-tmux: -w and value stripped before calling claude" "fail"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 14: integration (real tmux, no mock tmux) — -w creates named window
+# ---------------------------------------------------------------------------
+if command -v tmux >/dev/null 2>&1; then
+  INT_SOCK=$(mktemp -u /tmp/tmux-oc-test-XXXXXX)
+  INT_MOCK_BIN=$(mktemp -d)
+
+  # Sleeping mock claude keeps the window alive long enough to query
+  cat > "$INT_MOCK_BIN/claude" <<'EOF'
+#!/usr/bin/env bash
+sleep 3
+EOF
+  chmod +x "$INT_MOCK_BIN/claude"
+
+  trap 'tmux -S "$INT_SOCK" kill-server 2>/dev/null || true; rm -f "$INT_SOCK"; rm -rf "$INT_MOCK_BIN"; rm -rf "$MOCK_BIN" "$HAS_FLAG_WRAPPER" "$GET_WORKTREE_WRAPPER"' EXIT
+
+  if tmux -S "$INT_SOCK" new-session -d -s main -x 220 -y 24 2>/dev/null; then
+    SERVER_PID=$(tmux -S "$INT_SOCK" display-message -p "#{pid}" -t main 2>/dev/null || echo "0")
+
+    PATH="$INT_MOCK_BIN:$PATH" TMUX="$INT_SOCK,$SERVER_PID,0" \
+      bash "$SCRIPT" -w "oc-int-test" somearg 2>/dev/null || true
+
+    sleep 0.5
+
+    if tmux -S "$INT_SOCK" list-windows -t main 2>/dev/null | grep -q "oc-int-test"; then
+      run_test "integration (real tmux): -w creates named window" "pass"
+    else
+      echo "  Windows: $(tmux -S "$INT_SOCK" list-windows -t main 2>/dev/null || echo 'query failed')"
+      run_test "integration (real tmux): -w creates named window" "fail"
+    fi
+
+    tmux -S "$INT_SOCK" kill-server 2>/dev/null || true
+    rm -f "$INT_SOCK"
+    rm -rf "$INT_MOCK_BIN"
+  else
+    echo "  Could not start real tmux test server"
+    rm -rf "$INT_MOCK_BIN"
+    run_test "integration (real tmux): -w creates named window" "fail"
+  fi
+else
+  echo "SKIP: integration (real tmux): -w creates named window (tmux not found)"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
