@@ -81,7 +81,7 @@ if [[ -n "${TMUX:-}" ]] && ! has_flag "-p" "$@" && ! has_flag "--print" "$@"; th
     cmd="${cmd} $(printf '%q' "$arg")"
   done
 
-  tmux new-window -n "$window_name" bash -c "$cmd" || {
+  tmux new-window -n "$window_name" -c "$PWD" bash -c "$cmd" || {
     echo "error: tmux new-window failed; falling back to exec" >&2
     exec claude "${stripped_args[@]}"
   }
