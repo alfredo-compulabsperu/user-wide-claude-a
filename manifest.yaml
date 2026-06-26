@@ -9,6 +9,7 @@ commands:
   - name: open-gh-issue.md
   - name: open-gh-pr.md
   - name: rename-tmux-window.md
+  - name: fix-ecc-plan.md
 
 agents: []
 
