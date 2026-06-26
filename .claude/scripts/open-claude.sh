@@ -10,12 +10,14 @@
 set -euo pipefail
 
 # has_flag <flag> "$@"
-# Returns 0 if <flag> appears in the argument list, 1 otherwise.
-# Handles both short form (-x) and long form (--long).
+# Returns 0 if <flag> appears as a flag in the argument list (skipping values
+# that follow -w so a value that looks like a flag isn't misidentified).
 has_flag() {
-  local flag="$1"
+  local flag="$1" skip_next=0
   shift
   for arg in "$@"; do
+    if (( skip_next )); then skip_next=0; continue; fi
+    [[ "$arg" == "-w" ]] && { skip_next=1; continue; }
     [[ "$arg" == "$flag" ]] && return 0
   done
   return 1
@@ -35,30 +37,44 @@ get_worktree_name() {
 }
 
 # get_flag_value <flag> <args...>
-# Returns the value following <flag> in the argument list, or empty string.
+# Prints the value following <flag>. Exits 1 with an error if <flag> is the
+# last argument with no following value. Prints nothing and returns 0 if absent.
 get_flag_value() {
   local flag="$1"
   shift
   local prev=""
   for arg in "$@"; do
     if [[ "$prev" == "$flag" ]]; then
-      echo "$arg"
+      printf '%s\n' "$arg"
       return 0
     fi
     prev="$arg"
   done
+  if [[ "$prev" == "$flag" ]]; then
+    printf 'error: %s requires a value\n' "$flag" >&2
+    exit 1
+  fi
+}
+
+# strip_w_flag <args...>
+# Removes -w <value>; prints remaining args NUL-delimited.
+# Preserves -p/--print so they reach claude when in the passthrough path.
+strip_w_flag() {
+  local skip_next=0
+  for arg in "$@"; do
+    if (( skip_next )); then skip_next=0; continue; fi
+    [[ "$arg" == "-w" ]] && { skip_next=1; continue; }
+    printf '%s\0' "$arg"
+  done
 }
 
 # strip_wrapper_flags <args...>
-# Removes -p, --print and -w <value> from the argument list; prints remaining
-# args NUL-delimited (for use with `mapfile -d ''`).
+# Removes -w <value>, -p, and --print; prints remaining args NUL-delimited.
+# Used only in the tmux-passthrough path where -p/--print are wrapper signals.
 strip_wrapper_flags() {
   local skip_next=0
   for arg in "$@"; do
-    if (( skip_next )); then
-      skip_next=0
-      continue
-    fi
+    if (( skip_next )); then skip_next=0; continue; fi
     case "$arg" in
       -p|--print) continue ;;
       -w) skip_next=1; continue ;;
@@ -67,15 +83,27 @@ strip_wrapper_flags() {
   done
 }
 
+# collect_stripped_args <strip_fn> <args...>
+# Runs <strip_fn> over <args> and collects NUL-delimited output into the
+# global array $stripped_args. Compatible with bash 3.2+.
+collect_stripped_args() {
+  local strip_fn="$1"
+  shift
+  stripped_args=()
+  while IFS= read -r -d '' arg; do
+    stripped_args+=("$arg")
+  done < <("$strip_fn" "$@")
+}
+
 if [[ -n "${TMUX:-}" ]] && ! has_flag "-p" "$@" && ! has_flag "--print" "$@"; then
   # Determine window name: -w flag takes precedence over worktree name
-  window_name=$(get_flag_value "-w" "$@")
+  window_name=$(get_flag_value "-w" "$@") || exit 1
   if [[ -z "$window_name" ]]; then
     window_name=$(get_worktree_name)
   fi
 
-  # Build command string, stripping all wrapper-only flags
-  mapfile -d '' stripped_args < <(strip_wrapper_flags "$@")
+  # Build command string, stripping only -w <value>
+  collect_stripped_args strip_w_flag "$@"
   cmd="claude"
   for arg in "${stripped_args[@]}"; do
     cmd="${cmd} $(printf '%q' "$arg")"
@@ -86,7 +114,12 @@ if [[ -n "${TMUX:-}" ]] && ! has_flag "-p" "$@" && ! has_flag "--print" "$@"; th
     exec claude "${stripped_args[@]}"
   }
 else
-  # Strip all wrapper-only flags before handing off to claude
-  mapfile -d '' passthrough_args < <(strip_wrapper_flags "$@")
-  exec claude "${passthrough_args[@]}"
+  if [[ -n "${TMUX:-}" ]]; then
+    # -p/--print triggered passthrough inside tmux; they are wrapper signals here
+    collect_stripped_args strip_wrapper_flags "$@"
+  else
+    # Outside tmux: only -w is a wrapper flag; preserve -p/--print for claude
+    collect_stripped_args strip_w_flag "$@"
+  fi
+  exec claude "${stripped_args[@]}"
 fi

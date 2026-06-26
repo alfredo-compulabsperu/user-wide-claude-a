@@ -99,6 +99,13 @@ else
   run_test "has_flag --print returns false when absent" "fail"
 fi
 
+# Test 3b: has_flag skips -w values (context-aware)
+if ! bash "$HAS_FLAG_WRAPPER" "--print" "-w" "--print" 2>/dev/null; then
+  run_test "has_flag: --print as -w value is not treated as a flag" "pass"
+else
+  run_test "has_flag: --print as -w value is not treated as a flag" "fail"
+fi
+
 # ---------------------------------------------------------------------------
 # Test 4: non-tmux path passes args verbatim to claude
 # ---------------------------------------------------------------------------
@@ -326,7 +333,7 @@ fi
 # Test 12: -w flag and its value are stripped from the claude command string
 # ---------------------------------------------------------------------------
 if [[ -f "$MOCK_BIN/tmux.args" ]]; then
-  cmd_line=$(awk '/^-c$/{getline; print; exit}' "$MOCK_BIN/tmux.args")
+  cmd_line=$(awk '/^bash$/{found=1; next} found && /^-c$/{getline; print; exit}' "$MOCK_BIN/tmux.args")
   if [[ " $cmd_line " == *" -w "* ]] || [[ " $cmd_line " == *" custwin "* ]] || [[ "$cmd_line" == *" custwin" ]]; then
     echo "  -w or value leaked into claude cmd: $cmd_line"
     run_test "-w: -w and value stripped from claude command" "fail"
@@ -352,6 +359,34 @@ if [[ -f "$MOCK_BIN/claude.args" ]]; then
   fi
 else
   run_test "non-tmux: -w and value stripped before calling claude" "fail"
+fi
+
+# ---------------------------------------------------------------------------
+# Test: -w without value exits with an error message
+# ---------------------------------------------------------------------------
+rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
+error_output=$(PATH="$MOCK_BIN:$PATH" TMUX="fake-tmux-session" bash "$SCRIPT" -w 2>&1 || true)
+if [[ "$error_output" == *"requires a value"* ]]; then
+  run_test "-w without value: exits with error" "pass"
+else
+  echo "  output: $error_output"
+  run_test "-w without value: exits with error" "fail"
+fi
+
+# ---------------------------------------------------------------------------
+# Test: non-tmux path — --print is forwarded to claude (not stripped)
+# ---------------------------------------------------------------------------
+rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
+PATH="$MOCK_BIN:$PATH" TMUX="" bash "$SCRIPT" --print "what is 2+2" 2>/dev/null || true
+if [[ -f "$MOCK_BIN/claude.args" ]]; then
+  if grep -qx '\-\-print' "$MOCK_BIN/claude.args" 2>/dev/null; then
+    run_test "non-tmux: --print forwarded to claude (not stripped)" "pass"
+  else
+    echo "  claude.args: $(cat "$MOCK_BIN/claude.args")"
+    run_test "non-tmux: --print forwarded to claude (not stripped)" "fail"
+  fi
+else
+  run_test "non-tmux: --print forwarded to claude (not stripped)" "fail"
 fi
 
 # ---------------------------------------------------------------------------
