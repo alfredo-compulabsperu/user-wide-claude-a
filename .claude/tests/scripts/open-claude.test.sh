@@ -398,6 +398,37 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Test 15: tmux new-window passes -c $PWD so new window opens in caller's CWD
+# ---------------------------------------------------------------------------
+rm -f "$MOCK_BIN/claude.args" "$MOCK_BIN/tmux.args"
+
+# Reset mock tmux to success
+cat > "$MOCK_BIN/tmux" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$(dirname "$0")/tmux.args"
+EOF
+chmod +x "$MOCK_BIN/tmux"
+
+EXPECTED_CWD=$(mktemp -d)
+(cd "$EXPECTED_CWD" && PATH="$MOCK_BIN:$PATH" TMUX="fake-tmux-session" bash "$SCRIPT" somearg 2>/dev/null || true)
+rmdir "$EXPECTED_CWD"
+
+if [[ -f "$MOCK_BIN/tmux.args" ]]; then
+  cwd_arg=$(awk '/^-c$/{getline; print; exit}' "$MOCK_BIN/tmux.args")
+  if [[ "$cwd_arg" == "$EXPECTED_CWD" ]]; then
+    run_test "tmux new-window: -c \$PWD passed so new window opens in caller CWD" "pass"
+  else
+    echo "  Expected -c: $EXPECTED_CWD"
+    echo "  Got -c:      $(printf '%q' "$cwd_arg")"
+    echo "  tmux args:   $(cat "$MOCK_BIN/tmux.args")"
+    run_test "tmux new-window: -c \$PWD passed so new window opens in caller CWD" "fail"
+  fi
+else
+  echo "  tmux was not called"
+  run_test "tmux new-window: -c \$PWD passed so new window opens in caller CWD" "fail"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
