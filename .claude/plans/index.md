@@ -1,0 +1,1 @@
+| [plan-m7-import-export-artifact.plan](plan-m7-import-export-artifact.plan.md) | `promote-artifact` actually pulls artifacts *from* `~/.claude/` *into* the repo (confirmed by reading its SKILL.md) — "promote" was the wron | unknown | unknown | draft |
