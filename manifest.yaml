@@ -1,9 +1,11 @@
 version: 1
-generated: "2026-06-13"  # Update manually or via generation tool
+generated: "2026-07-08"  # Update manually or via generation tool
 idempotency: prompt  # skip | overwrite | prompt — sync script default
 
 skills:
   - name: catalog
+  - name: knowledge-ops
+  - name: research-ops
 
 commands:
   - name: open-claude.md
