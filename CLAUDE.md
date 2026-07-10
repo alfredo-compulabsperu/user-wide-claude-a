@@ -1,7 +1,7 @@
 # user-wide-claude-a
 
 Portability system that syncs Claude Code artifacts (skills, commands, agents,
-scripts, plugins, CLAUDE.md) from this repo to `~/.claude/` on any machine.
+scripts, output styles, plugins, CLAUDE.md) from this repo to `~/.claude/` on any machine.
 
 ## Key Commands
 
@@ -31,7 +31,7 @@ bash sync.sh --force      # Overwrite stale artifacts without prompting
 
 ## Manifest Sections
 
-`skills`, `commands`, `agents`, `scripts`, `plugins`, `claude_md` → maps 1:1 to
+`skills`, `commands`, `agents`, `scripts`, `output_styles`, `plugins`, `claude_md` → maps 1:1 to
 `~/.claude/` subdirectories. Adding an entry without the file causes `[MISSING]` in dry-run.
 
 ## Gotchas

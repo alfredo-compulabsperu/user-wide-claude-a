@@ -113,7 +113,7 @@ import yaml, os, sys
 try:
   d = yaml.safe_load(open(os.environ['MANIFEST_PATH']))
   issues = []
-  for section in ['skills', 'commands', 'agents', 'scripts']:
+  for section in ['skills', 'commands', 'agents', 'scripts', 'output_styles']:
     for i, entry in enumerate(d.get(section, [])):
       if isinstance(entry, dict):
         if not entry.get('name'):
@@ -394,6 +394,13 @@ while IFS= read -r name; do
   install_file "$REPO_DIR/.claude/agents/$name" "$CLAUDE_DIR/agents/$name" "agents/$name"
 done <<< "$names"
 
+echo "--- output_styles ---"
+names=$(yaml_get_names output_styles) || { echo "ERROR: manifest parse failed for output_styles" >&2; exit 1; }
+while IFS= read -r name; do
+  [[ -n "$name" ]] || continue
+  install_file "$REPO_DIR/.claude/output-styles/$name" "$CLAUDE_DIR/output-styles/$name" "output-styles/$name"
+done <<< "$names"
+
 echo "--- scripts ---"
 scripts=$(yaml_get_scripts) || { echo "ERROR: manifest parse failed for scripts" >&2; exit 1; }
 while IFS= read -r entry; do
@@ -429,6 +436,7 @@ scan_local_only skills   "$CLAUDE_DIR/skills"
 scan_local_only commands "$CLAUDE_DIR/commands"
 scan_local_only agents   "$CLAUDE_DIR/agents"
 scan_local_only scripts  "$CLAUDE_DIR/scripts"
+scan_local_only output_styles "$CLAUDE_DIR/output-styles"
 
 echo ""
 echo "=== summary ==="
