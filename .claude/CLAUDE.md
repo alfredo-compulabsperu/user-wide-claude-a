@@ -68,7 +68,7 @@ Every piece of logic MUST have one implementation.
 | Hook script paths | MUST use `${CLAUDE_PROJECT_DIR}` as the path prefix for any hook command that references a file inside the project. MUST NOT use absolute paths or bare relative paths. |
 | Rationale | `${CLAUDE_PROJECT_DIR}` resolves to the session root in both normal and worktree sessions; bare relative paths fail when hook CWD differs from repo root; absolute paths break on other machines. |
 | Correct form | `"command": "cd \"${CLAUDE_PROJECT_DIR}/path/to/dir\" && npm run type-check"` |
-| Incorrect forms | `"command": "cd path/to/dir && ..."` (relative) · `"command": "cd /home/user/project/... && ..."` (absolute) <!-- validate-artifact: ignore-line --> |
+| Incorrect forms | `"command": "cd path/to/dir && ..."` (relative) · `"command": "cd /home/user/project/... && ..."` (absolute) <!-- # validate-artifact: ignore-line --> |
 | Scope | Applies to all hooks in `~/.claude/settings.json`, `.claude/settings.json`, and `.claude/settings.local.json`. |
 
 ## Archiving
@@ -83,7 +83,7 @@ Every piece of logic MUST have one implementation.
 
 | Rule | Requirement |
 |---|---|
-| Default KB path | When using `/ecc:knowledge-ops`, the knowledge base storage location MUST default to `/home/alfredo/knowledge-base/`. Use `projects/` for durable technical notes and runbooks, `sessions/` for session exports. <!-- validate-artifact: ignore-line --> |
+| Default KB path | When using `/ecc:knowledge-ops`, the knowledge base storage location MUST default to `/home/alfredo/knowledge-base/`. Use `projects/` for durable technical notes and runbooks, `sessions/` for session exports. <!-- # validate-artifact: ignore-line --> |
 
 ## Active Session Hooks
 

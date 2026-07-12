@@ -142,6 +142,19 @@ Manifest: updated | already listed
 Next: run /promote-artifact <path> --git to push to remote
 ```
 
+**Exception — `claude_md` type**: no `<artifact-name>` segment or pluralized
+directory (singleton file, per the Step 3 exception):
+
+```
+Promoted: CLAUDE.md
+Type:     claude_md
+Repo:     .claude/CLAUDE.md
+Local:    ~/.claude/CLAUDE.md
+Manifest: claude_md.portable set to true | already portable
+
+Next: run /promote-artifact ~/.claude/CLAUDE.md --git to push to remote
+```
+
 If `--git` was passed, skip this summary and continue to the git pipeline below.
 
 ---

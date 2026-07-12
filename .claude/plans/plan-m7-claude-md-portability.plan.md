@@ -33,7 +33,7 @@ Promote the live global `~/.claude/CLAUDE.md` into the repo as `.claude/CLAUDE.m
 
 ### Task 1: Seed `.claude/CLAUDE.md` from the live global file
 
-- **Action**: Copy `~/.claude/CLAUDE.md` to `.claude/CLAUDE.md`. In the copy only (not the live file), append `<!-- validate-artifact: ignore-line -->` to the two lines that legitimately match the `/home/` grep so validation passes without weakening the check:
+- **Action**: Copy `~/.claude/CLAUDE.md` to `.claude/CLAUDE.md`. In the copy only (not the live file), append `<!-- # validate-artifact: ignore-line -->` to the two lines that legitimately match the `/home/` grep so validation passes without weakening the check. The marker must contain the literal `#` — `validate-artifact/SKILL.md`'s exemption is a plain substring match on `# validate-artifact: ignore-line`, not comment-syntax-aware, so an HTML comment without the `#` would not exempt the line:
   - the illustrative "Incorrect forms" example line (`cd /home/user/project/...`)
   - the `Default KB path` rule line (`/home/alfredo/knowledge-base/`) — a personal path accepted per the PRD's resolved open question (same user, own machines)
 - **Mirror**: `.claude/skills/validate-artifact/SKILL.md:31,33` — same marker, same reasoning (deliberate, reviewed exception vs. real leak).
