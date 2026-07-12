@@ -38,6 +38,7 @@ Use `--type` if provided. Otherwise apply these heuristics in order:
 |---|---|
 | `<path>` is a directory containing `SKILL.md` | `skill` |
 | `<path>` is a `.md` file with a name matching a command (imperative verb or action noun) | `command` |
+| `<path>` basename is `CLAUDE.md` | `claude_md` |
 | `<path>` is a `.md` file | `agent` |
 | `<path>` is a `.sh` file or executable | `script` |
 | Ambiguous | Ask user to specify `--type` before continuing |
@@ -61,6 +62,15 @@ local dest: $HOME/.claude/<type>s/<artifact-name>
 
 For commands, preserve subdirectory structure (e.g. `archived/` prefix) if present in `<path>`.
 
+**Exception — `claude_md` type**: CLAUDE.md is a singleton file, not a named
+collection member, so it has no pluralized `<type>s/` directory and no
+`<artifact-name>` segment:
+
+```
+repo dest:  <repo_root>/.claude/CLAUDE.md
+local dest: $HOME/.claude/CLAUDE.md
+```
+
 ## Step 4 — Copy to repo and local
 
 For each destination (repo, then local):
@@ -75,7 +85,7 @@ For scripts with `executable: true`, run `chmod +x <local dest>` after copy.
 
 ## Step 5 — Update manifest.yaml
 
-Read `<repo_root>/manifest.yaml`. Check whether the artifact is already listed under its section (match by `name`). If not present, append the new entry:
+For `skill|command|agent|script`, read `<repo_root>/manifest.yaml`, check whether the artifact is already listed under its section (match by `name`), and if not present, append the new entry:
 
 ```python
 import yaml
@@ -98,6 +108,24 @@ if not any(e.get('name') == name for e in d.get(section, [])):
     print('Manifest: updated')
 else:
     print('Manifest: already listed')
+```
+
+**Exception — `claude_md` type**: there is no list section to append to — `claude_md`
+is a single scalar flag. Set it instead (idempotent no-op if already `true`):
+
+```python
+import yaml
+
+with open('manifest.yaml') as f:
+    d = yaml.safe_load(f)
+
+if not d.get('claude_md', {}).get('portable'):
+    d.setdefault('claude_md', {})['portable'] = True
+    with open('manifest.yaml', 'w') as f:
+        yaml.dump(d, f, default_flow_style=False, sort_keys=False)
+    print('Manifest: claude_md.portable set to true')
+else:
+    print('Manifest: already portable')
 ```
 
 ## Step 6 — Summary (local-only mode)
@@ -142,6 +170,16 @@ git commit -m "promote(<type>): <artifact-name>"
 git push -u origin "$BRANCH"
 ```
 
+**Exception — `claude_md` type**: no `<artifact-name>` segment (singleton file):
+
+```bash
+BRANCH="promote/claude_md/CLAUDE.md"
+git checkout -b "$BRANCH"
+git add .claude/CLAUDE.md manifest.yaml
+git commit -m "promote(claude_md): CLAUDE.md"
+git push -u origin "$BRANCH"
+```
+
 ### Create PR
 
 ```bash
@@ -167,6 +205,15 @@ gh pr create \
 Promoted via \`/promote-artifact --git\`
 EOF
 )"
+```
+
+**Exception — `claude_md` type**: the PR body's "Manifest entry added" section
+reports the scalar flag instead of a `name:` list entry:
+
+```
+## Manifest entry added
+
+- claude_md.portable: true
 ```
 
 Capture the PR URL from `gh pr create` output.

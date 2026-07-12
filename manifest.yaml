@@ -29,7 +29,7 @@ scripts:
     executable: true
 
 claude_md:
-  portable: false
+  portable: true
 
 plugins:
   - id: context-mode
