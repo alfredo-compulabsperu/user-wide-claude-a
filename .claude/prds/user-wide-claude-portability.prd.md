@@ -84,14 +84,16 @@ We'll know we're right when **a fresh machine reaches full user-wide Claude arti
 | 4 | `/validate-artifact` skill | An artifact can be validated as repo-agnostic, dependency-complete, and terse — standalone, callable independently of promote | complete | `.claude/plans/plan-m4-validate-artifact.plan.md` |
 | 5 | `/promote-artifact` skill (local) | An artifact passes validation then is copied to `~/.claude/<type>/` — works offline, no git required | complete | `.claude/plans/plan-m5-promote-local.plan.md` |
 | 6 | `/promote-artifact` git pipeline | Promoted artifact is branched, committed, pushed, PR created, and squash-merged automatically — no auto-review, no auto-fix | complete | `.claude/plans/plan-m6-promote-git.plan.md` |
+| 7 | CLAUDE.md portability | Global `CLAUDE.md` can be promoted from `~/.claude/CLAUDE.md` into the repo (as `.claude/CLAUDE.md`), validated for machine-specific content, `manifest.yaml`'s `claude_md.portable` flipped to `true`, and synced to new machines via the existing `/validate-artifact` and `/promote-artifact` pipeline — closing the gap where `sync.sh` currently hard-skips CLAUDE.md | complete | `.claude/plans/plan-m7-claude-md-portability.plan.md` |
 
 ## Open Questions
 
 - [ ] Should the manifest be a flat file (JSON/YAML) or inferred from directory structure?
 - [ ] What is the idempotency behavior — overwrite silently, skip if exists, or prompt?
-- [ ] Is `CLAUDE.md` fully portable or does it contain any machine-specific content?
+- [x] Is `CLAUDE.md` fully portable or does it contain any machine-specific content? — Resolved 2026-07-12: no secrets found; one personal path (`/home/alfredo/knowledge-base/`) assumed stable across the user's own machines, acceptable per scope (not for other users' environments).
 - [ ] How does `/validate-artifact` detect repo-agnostic violations — static grep for known path patterns, or LLM judgment?
 - [ ] Merge strategy for the git pipeline — squash resolved (council), but what is the PR title/body convention?
+- [ ] Does `/validate-artifact` and `/promote-artifact` treat `claude_md` as a first-class artifact type (new `type: claude_md` case), or is CLAUDE.md special-cased separately given it's a single file, not a `name`d directory/file collection?
 
 ## Risks
 
@@ -102,4 +104,4 @@ We'll know we're right when **a fresh machine reaches full user-wide Claude arti
 | Repo drifts from actual `~/.claude/` state | High | Low | Drift detection script run periodically |
 
 ---
-*Status: DRAFT — requirements only. Implementation planning pending via /plan.*
+*Status: EXECUTED — all milestones complete.*
