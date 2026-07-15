@@ -32,19 +32,68 @@ the way — unless something explicitly hands that fact forward. That's the
 runbook accumulates it, and it gets threaded into the next dependent unit's
 prompt. Nothing is assumed shared; everything needed is explicit.
 
+## Harness tool bindings
+
+execute-plan delegates two chores: **sequencing verification** and **code
+review**. Read an explicit binding the harness declares — repo `CLAUDE.md`, a
+`.claude/rules/*` file, or a `.claude/execute-plan.bindings.*` file — keyed by
+chore, matched by **exact key only**, never by keyword-matching prose:
+
+~~~
+execute-plan bindings:
+  planner:      <agent to verify plan sequencing>
+  review:       <tool for the Step 4 review loop>
+~~~
+
+| Chore | If the harness binds it | Fallback (binding absent) |
+|---|---|---|
+| `planner` | use exactly that | **HALT** — this is a precondition, not a runtime search: do not scan installed agents by name for something containing "planner"; ask the user which planner agent to use or to install one before Step 0 runs |
+| `review` | use exactly that | `/ecc:review-pr` |
+
+An **unbound** chore takes its fallback — full stop, same discipline as
+run-prd's binding table.
+
 ## Dependencies
 
-- `ecc:planner` agent (ships with the ecc plugin) — sequencing check.
-  **Fallback chain**: if `ecc:planner` isn't available in this session, search
-  installed agents for any name containing "planner" (case-insensitive) and use
-  that instead. If none exists at all, **HALT** — tell the user no planner agent
-  is available and ask how to proceed. Do not skip sequencing silently.
-- `/ecc:loop-start` (sequential, fast mode) — runbook scaffolding, if available.
-  If the command isn't installed, build the runbook directly following Step 2
-  below — the command is a convenience, not a hard dependency.
-- `/ecc:review-pr` — the review-loop step.
-- `gh` CLI, authenticated, with a remote the current branch can open/target a PR
-  against.
+- `/ecc:loop-start` (sequential, fast mode) — runbook scaffolding, if
+  available. If the command isn't installed, build the runbook directly
+  following Step 2 below — the command is a convenience, not a hard
+  dependency.
+- `gh` CLI, authenticated, with a remote the current branch can open/target a
+  PR against — hard dependency, no binding applies.
+
+## Confirmation model
+
+Two modes, chosen by the presence of `--confirm`:
+
+- **Default (no `--confirm`): fully unattended.** Once Step 0 and Step 1
+  clear, every unit's execution, commit, PR update, and the review loop
+  proceed without stopping to ask the user anything.
+- **`--confirm`: one upfront prompt, then still unattended.** Ask "execute
+  this plan end-to-end? (y/n)" once, before Step 0. Decline → stop. Approve
+  → proceed exactly as default mode — no further per-unit prompts.
+- **Headless or nested invocation.** This prompt is interactive-only. If
+  execute-plan runs headless (cron, or nested inside another orchestrating
+  skill with no live user to answer) and `--confirm` wasn't resolved upfront
+  by the caller, **default to unattended** rather than blocking on a prompt
+  nothing will answer. The same applies to any other HALT-and-ask in this
+  skill (e.g. an unbound `planner`) — headless means surface the gap in the
+  final report and stop, not wait for input.
+- **What neither mode touches:** Step 1's completeness-gate HALT, an ERROR
+  status HALT in Step 3, and the *Safety gates* below — all are hard stops
+  regardless of confirmation mode.
+
+## Safety gates (apply throughout)
+
+- **Destructive-action tiering.** Proceed on non-destructive (add file,
+  update ref, in-repo rename) and recoverable (delete git-tracked file — log
+  it) actions. **HALT and ask** on non-recoverable: `git push --force`,
+  history rewrite of pushed commits, dropping data (a destructive DB
+  migration with no reversible backup, deleting a credential/secret with no
+  other copy, clearing unrecoverable external state), deleting untracked
+  files with no history, touching CI/CD affecting live deploys. Applies
+  regardless of confirmation mode or a unit's own STATUS — an `OK` never
+  authorizes a destructive action on its own.
 
 ## Step 0: Locate and verify the plan
 
@@ -99,8 +148,13 @@ right when a single phase bundles independent sub-changes that would otherwise
 force serialization for no reason.
 
 Runbook contents: unit list in execution order, each unit's dependencies, each
-unit's expected `HANDOFF` inputs (from Step 1), and a `## Context Ledger`
-section — empty at creation, appended to as units complete (Step 3).
+unit's expected `HANDOFF` inputs (from Step 1), a **per-unit status table**
+(pending/OK/WARN/ERROR, one row per unit) and a **per-round status** for Step
+4's review loop, and a `## Context Ledger` section — empty at creation. All
+of these are **written back to the runbook file on disk** as each unit or
+round completes (Step 3/Step 4), not just held in conversation — this file is
+the only durable state a rerun can check, since the plan file itself carries
+no status.
 
 ## Step 3: Execute units — isolated, gated, context-threaded
 
@@ -112,27 +166,42 @@ For each unit, in order:
    read files you haven't told it to), and the mandatory report format below.
 2. **Dispatch as a fresh isolated agent** (foreground, sequential — no shared
    memory with prior units or the main conversation).
-3. **Require this report format**, last thing in the agent's response:
+3. **Require this report format**, enclosed for reliable extraction — last
+   thing in the agent's response:
    ```
+   --AGENT RESULT--
    STATUS: OK | WARN | ERROR
    SUMMARY: <one paragraph, what happened>
    HANDOFF: <facts a downstream unit needs — paths created/moved, decisions
              made, IDs/hashes/commit SHAs, discovered constraints — or "none">
+   --END AGENT RESULT--
    ```
-4. **Gate on STATUS:**
-   - **OK** — append `HANDOFF` to the runbook's Context Ledger. Commit → push →
-     open or update the PR (reuse an existing open PR for this branch if one
-     exists; otherwise open one targeting the repo's stated integration branch
-     — commonly `develop`, else the repo's documented default). Proceed.
-   - **WARN** — same actions as OK (ledger updated, gate passes, execution
-     continues) but log the warning prominently in the runbook's running log
-     AND the final report (Step 6). A WARN that silently disappears defeats
-     the point of having the status — it must surface to the user even though
-     it didn't block.
+   Extract from the **last** occurrence of this block in the response — an
+   agent's prose could otherwise contain an incidental look-alike string
+   earlier.
+4. **Gate on STATUS — verify, don't just parse.** Before trusting a report,
+   check an **observable post-condition**: does the file/commit/PR the unit
+   claims to have produced actually exist? An isolated agent can report `OK`
+   while having done nothing, or exit with a malformed/missing report block.
+   Only after that check:
+   - **OK** (post-condition confirmed) — append `HANDOFF` to the runbook's
+     Context Ledger, write this unit's row in the status table. Commit →
+     push → open or update the PR (reuse an existing open PR for this branch
+     if one exists; otherwise open one targeting the repo's stated
+     integration branch — commonly `develop`, else the repo's documented
+     default). Proceed.
+   - **OK but post-condition fails** — treat as **ERROR**: halt and surface
+     the mismatch rather than silently proceeding on a false-positive
+     self-report.
+   - **WARN** — same actions as OK (ledger updated, status table updated,
+     gate passes, execution continues) but log the warning prominently in
+     the runbook's running log AND the final report (Step 6). A WARN that
+     silently disappears defeats the point of having the status — it must
+     surface to the user even though it didn't block.
    - **ERROR** — **HALT.** Do not dispatch further units. Do not commit/push
-     the failed unit's partial work without asking. Surface the failing unit's
-     `SUMMARY` to the user and wait for direction (fix and resume from this
-     unit, adjust the plan, or abandon).
+     the failed unit's partial work without asking. Surface the failing
+     unit's `SUMMARY` to the user and wait for direction (fix and resume from
+     this unit, adjust the plan, or abandon).
 
 ## Step 4: Review loop
 
@@ -192,6 +261,27 @@ bury it in a list), commits/PR link, the review rounds run with what each
 found and fixed, and the retrospective — link the harness issue if filed, or
 confirm none was needed.
 
+## Resume / checkpoint
+
+If `<plan-path-without-.plan.md>.runbook.md` already exists, check its
+per-unit status table (Step 2) to determine which case this is:
+
+- **Partial** (some unit not yet `OK`, or Step 4's review loop not yet
+  clean) — resume normally: re-verify the last in-progress unit's state on
+  disk before continuing (don't assume it's untouched), then proceed from
+  there.
+- **Complete** (every unit `OK`, review loop already clean) — not a resume
+  case, the run already finished. Ask the user to choose:
+  - **Re-execute** — treat as fresh: confirm scope (all units or specific
+    ones), reset their status, proceed from Step 0.
+  - **Validate** — check whether the plan or its dependencies have drifted
+    since completion, without redoing implementation. Report drift, if any,
+    and stop.
+
+This prompt fires even in unattended mode — a one-time disambiguation about
+*which* run this is, not a per-unit pause, so *Confirmation model* doesn't
+skip it.
+
 ## When NOT to use this
 
 - A plan with one or two trivial, tightly-coupled changes — the isolation and
@@ -199,3 +289,8 @@ confirm none was needed.
 - The user wants to watch/direct execution live, step by step — this skill's
   whole model is autonomous progression through units; if they want to approve
   each step interactively, don't isolate, just do the work turn by turn.
+- The plan file is part of an **active `run-prd` milestone loop** — check for
+  a sibling `.claude/runbooks/*.runbook.md` or a PRD `Status` column showing
+  this milestone `in-progress`. If so, defer to that orchestrator instead of
+  double-driving the same plan; running both risks a second, conflicting PR
+  on top of `run-prd`'s own one-PR-for-the-whole-run discipline.

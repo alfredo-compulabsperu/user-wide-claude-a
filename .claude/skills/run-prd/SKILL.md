@@ -65,7 +65,10 @@ run state anywhere else — the PRD is the single source of truth.
 1. An isolated git worktree for the run (see *Phase 0 — Isolate*), unless
    already running inside one that matches this PRD.
 2. A runbook file at `.claude/runbooks/<prd-slug>.runbook.md` (create the dir if
-   missing) — the materialized, checkpointable plan of the run.
+   missing) — the materialized, checkpointable plan of the run, including a
+   running per-milestone log (isolate/inline + reason, STATUS, deviations)
+   appended as Phase B completes each milestone — Phase E's retrospective
+   reads this log, not a closed agent's context.
 3. Per-milestone plans saved by `/ecc:plan` under `.claude/plans/`.
 4. One branch, one PR, with the whole run's changes, reviewed twice.
 
@@ -136,16 +139,31 @@ For each milestone with `Status = pending`, in table order:
    against live disk/runtime — dispositions drift across sessions. Report drift
    before acting; don't build on a stale premise.
 2. Run `/ecc:plan <prd>` — it picks the next pending milestone and writes
-   `.claude/plans/<milestone-slug>.plan.md`. Save it. Regardless of mode, do
-   not pause here for `/ecc:plan`'s own confirmation gate — see *Confirmation
-   model* (the only possible pause is the single upfront `--confirm` prompt,
-   already resolved before Phase 0).
+   `.claude/plans/<milestone-slug>.plan.md`. **Include any `## Deviations`
+   logged by prior milestones in the prompt** — a deviation earlier in the
+   run (an approach change, a discovered constraint) can change what the
+   correct design is for this milestone; don't let `/ecc:plan` work from a
+   stale assumption. Save the plan. Regardless of mode, do not pause here
+   for `/ecc:plan`'s own confirmation gate — see *Confirmation model* (the
+   only possible pause is the single upfront `--confirm` prompt, already
+   resolved before Phase 0).
 3. **Dependency-sequence check.** A plan that adds a shared dependency (schema,
    artifact, command, field) can silently mis-order: a consumer scheduled before
    the thing it consumes exists. Verify creation-before-first-write, and
    replacement-before-deletion. For non-trivial plans, verify with a cold-read
-   planner agent ("assume no prior state") rather than self-review.
-4. Set the milestone `Status = in-progress` in the PRD.
+   planner agent ("assume no prior state") rather than self-review — see
+   *Harness tool bindings* for the `planner` binding this relies on.
+4. **Completeness gate for isolated dispatch.** If Phase B will isolate this
+   milestone's implementation (per the isolation rubric), check whether the
+   plan alone gives a fresh, zero-memory agent everything it needs: explicit
+   files, the exact change, an inline verification command. Split any gap
+   into two buckets — **resolvable via handoff** (an earlier phase/milestone
+   will produce it; note as an expected input) is not a blocker; **not
+   resolvable by anything in this run** (a human decision, missing
+   requirement) is a **HALT** — surface it before Phase B runs. Skip this
+   gate when Phase B runs inline (full conversation context already
+   present).
+5. Set the milestone `Status = in-progress` in the PRD.
 
 Whether to run step 2/3 **inline or isolated** is decided by the **isolation
 rubric** below.
@@ -168,18 +186,44 @@ For the plan just generated:
      with the **general agent**. TDD ceremony on prose wastes turns.
    - **Mixed** → resolved TDD workflow for the code artifacts, general agent for
      the rest.
-2. Decide **inline vs isolated** via the rubric.
-3. **Verify plan/PRD fidelity, not just the post-condition.** Before marking
+2. Decide **inline vs isolated** via the rubric. **If isolated**, the dispatch
+   prompt must explicitly state: implement this plan directly via the TDD
+   workflow — do not invoke `execute-plan` or treat this as its own
+   end-to-end plan-to-PR run; this milestone's PR/review is owned by this
+   run's Phase C/D, not by the dispatched call. This prevents a dispatched
+   agent from re-triggering `execute-plan`'s own skill recognition on the
+   same plan file and opening a second, conflicting PR.
+3. **Require a structured report from isolated implementation calls**, last
+   thing in the agent's response, enclosed for reliable extraction:
+   ```
+   --AGENT RESULT--
+   STATUS: OK | WARN | ERROR
+   SUMMARY: <one paragraph, what happened>
+   DEVIATIONS: <what plan/PRD requirement wasn't honored and why, or "none">
+   --END AGENT RESULT--
+   ```
+   Inline implementation skips this — the orchestrator already has full
+   context and performs the fidelity check itself in step 4.
+4. **Verify plan/PRD fidelity, not just the post-condition.** Before marking
    complete, check whether the implementation honored every requirement the
    *plan or PRD stated specifically for this milestone* — a named library,
    a required format, an explicit exclusion, a stated non-functional
    constraint — not just whether it passes its functional gate. (This is
    about this plan/PRD's own stated requirements; general repo/harness rules,
-   if any, are a separate governance layer this skill does not police.) Log
-   any deviation in the runbook's `## Deviations` section (milestone, what
-   was required, what happened, why) before proceeding — a deviation doesn't
-   block `complete` by itself, but it must never be silent.
-4. On success (post-condition verified — see *Gates*), set the milestone
+   if any, are a separate governance layer this skill does not police.) For
+   an isolated call, this is the returned `DEVIATIONS` field, not a fresh
+   self-review — the orchestrator has no other visibility into what happened
+   inside that call. Log any deviation in the runbook's `## Deviations`
+   section (milestone, what was required, what happened, why) **immediately
+   on the call returning** — a deviation doesn't block `complete` by itself,
+   but it must never be silent, and it cannot be recovered later once an
+   isolated call's context is gone.
+5. **Append this milestone's outcome to the runbook's running log**
+   (isolate/inline decision + one-line reason, STATUS if isolated,
+   deviations if any) regardless of step 4's outcome. Phase E's retrospective
+   can only read what happened inside an isolated call from this log and
+   from git history — it cannot reach back into a closed agent context.
+6. On success (post-condition verified — see *Gates*), set the milestone
    `Status = complete` in the PRD.
 
 **Writes must not race.** The whole run lands on **one branch / one working
@@ -218,27 +262,58 @@ this run's commits. Commit + push after each pass.
 
 - **`fast` (default):** one pass with the resolved fast reviewer (fallback: the
   `ecc:code-reviewer` agent). A cheap, quick gate for the common case.
-- **`normal`:** two passes with the resolved normal reviewer (fallback:
-  `/ecc:code-review`); the **second pass runs isolated** (fresh agent, clean
-  context) so it isn't anchored by pass 1's conclusions — an independent look at
-  the post-fix diff.
+- **`normal`:** bounded convergence rounds with the resolved normal reviewer
+  (fallback: `/ecc:code-review`) — round 1 always runs; round 2 always runs
+  **isolated** (fresh agent, clean context, not anchored by round 1)
+  regardless of what round 1 found; round 3+ only if the immediately prior
+  round found any non-LOW issue, stopping at the first clean round.
 - **`full`:** the resolved full reviewer (fallback: `/ecc:review-pr`), which is
   already a comprehensive multi-agent review. Run once; a light isolated re-check
   after fixes is optional, not required.
 
+### Phase E — Retrospective
+
+Once Phase D's review rounds leave no non-LOW findings, produce one combined
+analysis from two sources:
+
+1. **Rule violations** — review the whole run's changes against the repo's
+   `CLAUDE.md`/`rules/*.md`: which rules were violated, in which milestone,
+   when.
+2. **Review findings** — every non-LOW finding any Phase D round surfaced,
+   fixed or not.
+
+For each item: **root cause** (why the process produced it, not just what
+broke — a missing rule in a milestone's dispatch prompt? a gap Phase A's
+completeness gate should have caught but didn't?), a **confidence level**
+(High/Medium/Low) on that diagnosis, and a **remediation** framed through a
+named principle (KISS/YAGNI/SRP/DRY/JIT) — a remediation with no named
+principle is probably vague; tighten it.
+
+File the whole analysis as one GH issue labeled `harness`. **Track only — do
+not auto-fix.** If neither list has anything, skip the issue and say so
+plainly in the final report.
+
+This phase never blocks the Stop condition on its own findings, but it must
+have run — see *Stop condition*.
+
 ### Stop condition
 
-Done when **all milestones are `complete`** AND **both review passes leave no
-non-LOW findings** on the PR. Report and hand back to the user for merge (respect
-branch protection; surface the approval choice rather than bypassing silently).
+Done when **all milestones are `complete`** AND **the review depth's rounds
+leave no non-LOW findings** on the PR AND **Phase E's retrospective has run**
+(filed or explicitly skipped as empty) — the retrospective never blocks on
+its own findings, but it must have executed before the run reports itself
+ready for merge; don't declare done while it's still pending. Report and hand
+back to the user for merge (respect branch protection; surface the approval
+choice rather than bypassing silently).
 
 ## Harness tool bindings — how each chore's tool is chosen
 
-run-prd delegates three chores: **implementation/TDD**, **code review**, and
-**isolation assessment**. It must not *guess* which tool to use — searching the
-repo or your user-wide config could match an unrelated agent, skill, or command
-and silently do the wrong thing. Instead it reads an **explicit binding the
-harness declares**, and falls back only when a chore is left unbound.
+run-prd delegates four chores: **implementation/TDD**, **code review**,
+**isolation assessment**, and **sequencing verification**. It must not *guess*
+which tool to use — searching the repo or your user-wide config could match an
+unrelated agent, skill, or command and silently do the wrong thing. Instead it
+reads an **explicit binding the harness declares**, and falls back only when a
+chore is left unbound.
 
 **Where it reads.** Look for an explicit run-prd tool-binding block the harness
 provides, keyed by chore, in the repo `CLAUDE.md`, a `.claude/rules/*` file, or a
@@ -252,6 +327,7 @@ run-prd bindings:
   review.normal:  <tool>
   review.full:    <tool>
   isolation:      <tool>
+  planner:        <agent to verify plan sequencing>
 ~~~
 
 A binding's value may be any form the harness prefers — a raw instruction, a rule,
@@ -267,11 +343,17 @@ inferred.
 | `review.normal` | use exactly that | `/ecc:code-review` |
 | `review.full` | use exactly that | `/ecc:review-pr` |
 | `isolation` | use exactly that | the *isolation inner rubric* below |
+| `planner` | use exactly that | **HALT** — this is a precondition, not a runtime search: do not scan installed agents by name; ask the user which planner agent to use or to install one before Phase A step 3 runs |
 
 An **unbound** chore takes its fallback — full stop. Do not substitute a tool
 because something in the repo or user config merely *looks* like a
 reviewer/tester/router. The whole point of the explicit binding is that the
 operator, not the skill's guesswork, chooses; predictability beats cleverness.
+
+**Headless note.** A `planner` HALT (or any other HALT in this skill) has no
+one to ask in a headless or scheduled invocation — there, "HALT and ask" means
+stop the run and surface the gap clearly in the final report, not block on a
+prompt nothing will answer.
 
 ### Isolation inner rubric (fallback)
 
@@ -368,3 +450,12 @@ Isolation:    via <repo tool | inner rubric> · <count inline vs isolated, reaso
 
 Stop condition met: <yes/no>.  Ready for merge: <yes — with caveats / no>.
 ```
+
+## When NOT to use this
+
+- A PRD with a single milestone, or milestones with no real dependency
+  chain — the worktree isolation, runbook, and phased gating overhead isn't
+  worth it. Just run `/ecc:plan` once and implement directly.
+- The user wants to watch/direct each milestone live — this skill's model is
+  autonomous progression through milestones; for live approval per step,
+  don't invoke run-prd, drive it turn by turn instead.
