@@ -6,6 +6,8 @@ skills:
   - name: catalog
   - name: knowledge-ops
   - name: research-ops
+  - name: run-prd
+  - name: execute-plan
 
 commands:
   - name: open-claude.md
@@ -15,6 +17,10 @@ commands:
   - name: session-summary.md
 
 agents: []
+
+output_styles:
+  - name: plain-terse-glossed.md
+  - name: terse-technical.md
 
 scripts:
   - name: gh-lib.sh
@@ -28,7 +34,7 @@ scripts:
     executable: true
 
 claude_md:
-  portable: false
+  portable: true
 
 plugins:
   - id: context-mode

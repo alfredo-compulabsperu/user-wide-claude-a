@@ -1,0 +1,51 @@
+{
+  "skill_name": "run-prd",
+  "notes": "Structural / dry-run validation: each prompt scopes the agent to materialize the runbook and stop at the Pre-flight gate, so we assert on runbook SHAPE without a full live execution (which would make real commits/PRs). Assertions check the generated .claude/runbooks/<slug>.runbook.md and the agent's stated plan.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "explicit-real-prd",
+      "prompt": "Take .claude/prds/save-claude-state.prd.md all the way to a PR — plan and build every milestone. First produce the runbook and stop at the Pre-flight gate so I can look before it executes.",
+      "expected_output": "Materialized runbook at .claude/runbooks/save-claude-state.runbook.md with Pre-flight first, a plan step per pending milestone from the Status column, tdd-vs-general implementation branch, single commit+PR consolidation, two review passes (2nd isolated) fixing non-LOW, stop=all-complete-and-clean, isolation assessment logged. Execution halts at the Pre-flight gate.",
+      "files": [".claude/prds/save-claude-state.prd.md"],
+      "assertions": [
+        "runbook file created at .claude/runbooks/save-claude-state.runbook.md",
+        "Pre-flight is the first phase and lists only human-only chores (or explicitly none)",
+        "one plan step per pending milestone, driven by the PRD Status column",
+        "implementation uses the tdd binding if the harness declares one, else falls back to /ecc:tdd-workflow, for code plans vs general agent for non-code",
+        "review and TDD tools are resolved from explicit harness bindings (chore-keyed, e.g. CLAUDE.md/.claude/rules/.claude/run-prd.bindings.*) rather than guessed or keyword-matched from repo/user config; each chore falls back independently only if unbound",
+        "single commit + one PR consolidation phase (not per-plan PRs)",
+        "no --review given, so default fast mode = one pass via the review.fast binding if declared, else the ecc:code-reviewer agent fallback, fixing all non-LOW",
+        "stop condition = all milestones complete AND both review passes clean of non-LOW",
+        "isolation assessment uses the isolation binding if the harness declares one, else the skill's own inner rubric, and logs which was used per plan/implementation call",
+        "execution stops at the Pre-flight gate as requested (does not commit or open a PR)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "implicit-latest-prd",
+      "prompt": "the prd's done, now just implement the whole thing end to end for me. show me the runbook first before you start running it.",
+      "expected_output": "Skill resolves the PRD by finding the most recently modified .prd.md under .claude/prds/ and confirms it, then produces the same runbook shape as eval 1, stopping before execution.",
+      "files": [],
+      "assertions": [
+        "resolves the target PRD as the most recently modified .prd.md under .claude/prds/ and confirms it",
+        "runbook written under .claude/runbooks/ for the resolved PRD slug",
+        "Pre-flight first; milestone loop keyed on the Status column",
+        "single commit+PR consolidation and two review passes (2nd isolated)",
+        "does not begin execution before showing the runbook"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "precondition-guard-no-milestones",
+      "prompt": "run-prd on .claude/prds/notes.prd.md",
+      "expected_output": "The PRD has no `## Delivery Milestones` table, so the skill stops and points the user to /ecc:plan-prd instead of fabricating a backlog. No runbook, plans, commits, or PR are produced.",
+      "files": [".claude/prds/notes.prd.md"],
+      "assertions": [
+        "detects the missing Delivery Milestones table and stops",
+        "points the user to /ecc:plan-prd (there is no backlog to walk)",
+        "does not fabricate milestones, write a runbook, or create any plans/commits/PR"
+      ]
+    }
+  ]
+}
