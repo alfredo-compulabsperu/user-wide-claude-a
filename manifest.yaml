@@ -6,6 +6,7 @@ skills:
   - name: catalog
 
 commands:
+  - name: open-bash.md
   - name: open-claude.md
   - name: open-gh-issue.md
   - name: open-gh-pr.md
@@ -19,6 +20,8 @@ output_styles:
 
 scripts:
   - name: gh-lib.sh
+  - name: open-bash.sh
+    executable: true
   - name: open-claude.sh
     executable: true
   - name: open-gh-issue.sh
