@@ -1,0 +1,4 @@
+| [issue-12-autonomous-worker.plan](issue-12-autonomous-worker.plan.md) | Add `.github/workflows/claude.yml` using `anthropic/claude-code-action` triggered by `issues: types: [opened]`. Claude receives a triage pro | unknown | unknown | draft |
+| [issue-12-autonomous-worker.plan](issue-12-autonomous-worker.plan.md) | Add `.github/workflows/claude.yml` using `anthropic/claude-code-action` triggered by `issues: types: [opened]`. Claude receives a triage pro | unknown | unknown | draft |
+| [issue-12-autonomous-worker.plan](issue-12-autonomous-worker.plan.md) | Add `.github/workflows/claude.yml` using `anthropic/claude-code-action` triggered by `issues: types: [opened]`. Claude receives a triage pro | unknown | unknown | draft |
+| [issue-12-autonomous-worker.plan](issue-12-autonomous-worker.plan.md) | Add `.github/workflows/claude.yml` using `anthropic/claude-code-action` triggered by `issues: types: [opened]`. Claude receives a triage pro | unknown | unknown | draft |
