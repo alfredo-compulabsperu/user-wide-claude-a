@@ -4,6 +4,8 @@ idempotency: prompt  # skip | overwrite | prompt — sync script default
 
 skills:
   - name: catalog
+  - name: run-prd
+  - name: execute-plan
 
 commands:
   - name: open-claude.md
