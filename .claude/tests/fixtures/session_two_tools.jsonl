@@ -1,0 +1,2 @@
+{"type":"tool_use","id":"tu_001","name":"Bash","input":{"command":"ls"}}
+{"type":"tool_use","id":"tu_002","name":"Read","input":{"file_path":"/tmp/foo.txt"}}

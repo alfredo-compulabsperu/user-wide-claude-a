@@ -1,0 +1,14 @@
+{
+  "enabledPlugins": {
+    "ecc@ecc": true,
+    "context-mode": true,
+    "chrome-devtools": true,
+    "context7": true,
+    "Gmail": true
+  },
+  "mcpServers": {
+    "some-mcp-server": {},
+    "another-mcp-server": {}
+  },
+  "disabledMcpjsonServers": []
+}
