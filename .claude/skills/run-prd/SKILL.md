@@ -46,7 +46,7 @@ run state anywhere else — the PRD is the single source of truth.
   If it doesn't, stop and point the user at `/ecc:plan-prd` — there's no backlog
   to walk.
 - **`--review <mode>`** (optional; default `fast`): review rigor for Phase D —
-  one of `fast` | `normal` | `full`. See *Review depth resolution*.
+  one of `fast` | `normal` | `full`. See *Phase D — Code review*.
 - **`--confirm`** (optional): ask one upfront "run this whole PRD end-to-end?
   (y/n)" before Phase 0 starts. Without it (the default), the run is fully
   unattended — see *Confirmation model*.
@@ -223,7 +223,7 @@ For the plan just generated:
    deviations if any) regardless of step 4's outcome. Phase E's retrospective
    can only read what happened inside an isolated call from this log and
    from git history — it cannot reach back into a closed agent context.
-6. On success (post-condition verified — see *Gates*), set the milestone
+6. On success (post-condition verified — see *Safety gates*), set the milestone
    `Status = complete` in the PRD.
 
 **Writes must not race.** The whole run lands on **one branch / one working
