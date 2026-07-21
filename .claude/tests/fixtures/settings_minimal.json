@@ -1,0 +1,9 @@
+{
+  "enabledPlugins": {
+    "ecc@ecc": true,
+    "context-mode": true,
+    "chrome-devtools": true
+  },
+  "mcpServers": {},
+  "disabledMcpjsonServers": []
+}
