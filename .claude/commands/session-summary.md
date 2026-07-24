@@ -14,6 +14,8 @@ Default sections: Currently Doing, Pending or blocked, Next steps, Things worth 
 
 By default, show only the default sections. Pass `--extra` (verbatim, or inferred from phrasing like "show more" or "what else") to show only the extra sections instead. Pass `--full` (verbatim, or inferred from phrasing like "full summary," "show everything," or "complete summary") to show every section.
 
+If Next steps and/or Things worth saving renders at least one item, prompt the user afterward to pick one item number, from their combined running sequence, to work on next. Do not act on it until they answer. This applies even if one of the two sections is omitted for having nothing to report.
+
 ## Currently Doing
 Latest actions taken this session and their current status. Include the related plan, runbook (only if not closed this session), work item number + summary, or ad hoc topic for each action. If there has been a direction change, note what was active just before the pivot and its status at the time of the switch.
 
@@ -54,10 +56,7 @@ For each item, state what it is, why it would be lost, and one suggested destina
 
 Typical candidates: a decision and its rationale that no artifact records, a constraint or gotcha discovered by trial and error, a dead end that must not be retried, research findings, a user correction about how to work, or a scoped follow-up nobody has filed yet.
 
-After the list (Next steps + Things worth saving, combined), prompt the user to pick one item number to work on next. Do not act on it until they answer.
-
 ## Recommendations
-- KB Articles to create or update from research done during the session
 - Findings to document
 - Improvements to make
 
