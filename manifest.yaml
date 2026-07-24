@@ -8,6 +8,7 @@ skills:
   - name: research-ops
   - name: run-prd
   - name: execute-plan
+  - name: copy-plugin-tool
 
 commands:
   - name: open-claude.md
