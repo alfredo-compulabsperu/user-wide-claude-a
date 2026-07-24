@@ -18,6 +18,12 @@ bash sync.sh --force      # Overwrite stale artifacts without prompting
 | Add artifact found in `~/.claude/` to this repo | `/promote-artifact ~/.claude/<type>s/<name>` |
 | Add + open full git pipeline (branch → PR) | `/promote-artifact ... --git` |
 | Validate artifact before promotion | `/validate-artifact <path>` |
+| Extract one tool from an installed plugin (not the whole plugin) | `/copy-plugin-tool --plugin <hint> --tools <hint>` |
+
+`promote-artifact` and `validate-artifact` are repo-internal tooling for maintaining *this* repo's own
+artifact pipeline — deliberately absent from `manifest.yaml`/sync. Do not add manifest entries for them;
+that's not an oversight. `copy-plugin-tool` is a general-purpose skill and ships via `manifest.yaml` like
+any other.
 
 ## Key Files
 
@@ -28,6 +34,7 @@ bash sync.sh --force      # Overwrite stale artifacts without prompting
 | `docs/RUNBOOK.md` | Operational procedures (drift recovery, plugin failures) |
 | `.claude/skills/promote-artifact/` | Skill: add local artifact to repo |
 | `.claude/skills/validate-artifact/` | Skill: pre-promotion quality gate |
+| `.claude/skills/copy-plugin-tool/` | Skill: extract one tool from an installed plugin |
 
 ## Manifest Sections
 
