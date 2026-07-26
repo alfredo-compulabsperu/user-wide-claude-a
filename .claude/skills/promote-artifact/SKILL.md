@@ -11,7 +11,10 @@ args:
     description: "Explicit artifact type override: skill | command | agent | script"
     required: false
   - name: --force
-    description: Skip all overwrite prompts and proceed automatically.
+    description: Skip overwrite prompts for ordinary drift (SHA-256 differs, no prior baseline or baseline matches dest). Never bypasses a [DIVERGED] destination.
+    required: false
+  - name: --force-diverged
+    description: Also overwrite destinations flagged [DIVERGED] (edited out-of-band since last sync) without prompting.
     required: false
   - name: --git
     description: After local install, run the full git pipeline (branch → commit → push → PR → squash-merge).
@@ -25,7 +28,7 @@ Validates and installs an artifact into both the local `~/.claude/` directory an
 ## Invocation
 
 ```
-/promote-artifact <path> [--type skill|command|agent|script] [--force] [--git]
+/promote-artifact <path> [--type skill|command|agent|script] [--force] [--force-diverged] [--git]
 ```
 
 ---
@@ -71,17 +74,24 @@ repo dest:  <repo_root>/.claude/CLAUDE.md
 local dest: $HOME/.claude/CLAUDE.md
 ```
 
-## Step 4 — Copy to repo and local
+## Step 4 — Copy to repo and local (three-way divergence check)
+
+Use the same last-synced-baseline check `sync.sh` uses, via `.claude/scripts/sync-state.sh get|set <key>`:
+
+- **repo dest** — keyed `repo:<type>s/<artifact-name>` (or `repo:CLAUDE.md` for the `claude_md` singleton).
+- **local dest** — keyed `<type>s/<artifact-name>` (or `CLAUDE.md` for the singleton) — the *same* key `sync.sh` uses for this path, so the two tools share one baseline and neither falsely flags the other's normal sync as out-of-band.
 
 For each destination (repo, then local):
 
-1. If dest does not exist → copy (`cp -rp` for dirs, `cp -p` for files). Report `[INSTALLED]`.
-2. If dest exists and SHA-256 matches → skip. Report `[OK]`.
-3. If dest exists and SHA-256 differs:
-   - `--force` → overwrite. Report `[UPDATED]`.
-   - Otherwise → prompt "Overwrite existing <dest>? [y/N]". Overwrite on `y`, skip on `n`.
+1. Dest does not exist → copy (`cp -rp` for dirs, `cp -p` for files). Report `[INSTALLED]`. Record the baseline (`sync-state.sh set <key> <sha256 of dest>`).
+2. Dest exists and SHA-256 matches src → skip. Report `[OK]`. Self-heal the baseline (`sync-state.sh set <key> <sha256>`) even on a match, so pre-existing installs need no manual seeding.
+3. Dest exists and SHA-256 differs from src → read the baseline (`sync-state.sh get <key>`):
+   - No baseline, or baseline equals dest's current hash → **ordinary drift**: `--force` overwrites without prompting; otherwise prompt "Overwrite existing <dest>? [y/N]". Overwrite on `y`, skip on `n`. Update the baseline on overwrite.
+   - Baseline recorded and differs from dest's current hash → **`[DIVERGED]`**: show `diff -u <dest> <src>` (files) or `diff -rq <dest> <src>` (dirs). Plain `--force` does **not** bypass this — only `--force-diverged`, or an explicit interactive `y`, does. Declining reports `[SKIPPED] <dest> (out-of-band edit preserved)` and suggests re-running `/promote-artifact` on that destination instead to pull the hand-edit into the repo. Update the baseline on overwrite.
 
 For scripts with `executable: true`, run `chmod +x <local dest>` after copy.
+
+**Accepted limitation**: immediately after this check ships, artifacts with no recorded baseline yet fall into ordinary-drift, not diverged — protection applies going forward only, matching `sync.sh`.
 
 ## Step 5 — Update manifest.yaml
 

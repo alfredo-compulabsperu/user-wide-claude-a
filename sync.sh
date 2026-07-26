@@ -7,6 +7,7 @@ MANIFEST="$REPO_DIR/manifest.yaml"
 
 DRY_RUN=0
 FORCE=0
+FORCE_DIVERGED=0
 SUBCOMMAND="install"
 
 CNT_OK=0
@@ -14,6 +15,7 @@ CNT_UPDATED=0
 CNT_MISSING=0
 CNT_LOCAL_ONLY=0
 CNT_MISSING_PLUGIN=0
+CNT_DIVERGED=0
 
 usage() {
   cat >&2 <<EOF
@@ -23,9 +25,11 @@ Subcommands:
   install   (default) Copy artifacts from repo to ~/.claude/
 
 Options:
-  -n, --dry-run   Report what would change without modifying ~/.claude/
-  -f, --force     Overwrite existing files even when SHA-256 differs (no prompt)
-  -h, --help      Show this help
+  -n, --dry-run        Report what would change without modifying ~/.claude/
+  -f, --force           Overwrite existing files even when SHA-256 differs (no prompt)
+  -D, --force-diverged  Also overwrite destinations edited out-of-band since last sync
+                        (plain --force never does this — see [DIVERGED] below)
+  -h, --help            Show this help
 
 EOF
   exit 0
@@ -34,11 +38,12 @@ EOF
 # --- arg parsing ---
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -n|--dry-run) DRY_RUN=1 ;;
-    -f|--force)   FORCE=1 ;;
-    -h|--help)    usage ;;
-    install)      SUBCOMMAND="install" ;;
-    *)            echo "ERROR: unknown argument: $1" >&2; exit 1 ;;
+    -n|--dry-run)        DRY_RUN=1 ;;
+    -f|--force)          FORCE=1 ;;
+    -D|--force-diverged) FORCE_DIVERGED=1 ;;
+    -h|--help)           usage ;;
+    install)              SUBCOMMAND="install" ;;
+    *)                    echo "ERROR: unknown argument: $1" >&2; exit 1 ;;
   esac
   shift
 done
@@ -47,6 +52,8 @@ done
 [[ -f "$MANIFEST" ]]  || { echo "ERROR: manifest.yaml not found at $REPO_DIR" >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 required for YAML parsing" >&2; exit 1; }
 [[ -d "$CLAUDE_DIR" ]] || { echo "ERROR: $CLAUDE_DIR does not exist" >&2; exit 1; }
+SYNC_STATE_SCRIPT="$REPO_DIR/.claude/scripts/sync-state.sh"
+[[ -f "$SYNC_STATE_SCRIPT" ]] || { echo "ERROR: sync-state.sh not found at $SYNC_STATE_SCRIPT" >&2; exit 1; }
 
 # Stored as array so multi-word commands work safely with xargs -0 (C2)
 SHA256_CMD=()
@@ -152,6 +159,15 @@ dir_sha256() {
   fi
 }
 
+# --- sync-state helpers: last-synced SHA-256 baseline per artifact (three-way divergence check) ---
+sync_state_get() {
+  bash "$SYNC_STATE_SCRIPT" get "$1"
+}
+
+sync_state_set() {
+  bash "$SYNC_STATE_SCRIPT" set "$1" "$2"
+}
+
 # --- install_file <repo_path> <dest_path> <label> ---
 install_file() {
   local src="$1" dest="$2" label="$3"
@@ -169,6 +185,7 @@ install_file() {
       cp "$src" "$dest"
       echo "  [INSTALLED] $label"
       (( CNT_UPDATED++ )) || true
+      sync_state_set "$label" "$(file_sha256 "$dest")"
     fi
     return
   fi
@@ -178,8 +195,49 @@ install_file() {
   if [[ "$src_hash" == "$dest_hash" ]]; then
     echo "  [OK]       $label"
     (( CNT_OK++ )) || true
+    # Self-heal: bootstrap/refresh the baseline on every match so first-run installs
+    # need no manual seeding (accepted limitation: no baseline yet == trusted, not diverged).
+    [[ $DRY_RUN -eq 1 ]] || sync_state_set "$label" "$dest_hash"
     return
   fi
+
+  # Three-way check: is the destination's current hash the one we last synced,
+  # or has it been hand-edited out-of-band since then?
+  local baseline diverged=0
+  baseline="$(sync_state_get "$label")"
+  if [[ -n "$baseline" && "$baseline" != "$dest_hash" ]]; then
+    diverged=1
+  fi
+
+  if [[ $diverged -eq 1 ]]; then
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "  [DIVERGED] $label"
+      (( CNT_DIVERGED++ )) || true
+      return
+    fi
+    echo "  [DIVERGED] $label (destination edited out-of-band since last sync)"
+    diff -u "$dest" "$src" || true
+    if [[ $FORCE_DIVERGED -eq 1 ]]; then
+      cp "$src" "$dest"
+      echo "  [UPDATED]  $label"
+      (( CNT_UPDATED++ )) || true
+      sync_state_set "$label" "$(file_sha256 "$dest")"
+    else
+      read -rp "  Overwrite $label despite out-of-band edit? [y/N] " ans
+      if [[ "${ans,,}" == "y" ]]; then
+        cp "$src" "$dest"
+        echo "  [UPDATED]  $label"
+        (( CNT_UPDATED++ )) || true
+        sync_state_set "$label" "$(file_sha256 "$dest")"
+      else
+        echo "  [SKIPPED]  $label (out-of-band edit preserved — consider /promote-artifact to sync it back into the repo)"
+        (( CNT_DIVERGED++ )) || true
+      fi
+    fi
+    return
+  fi
+
+  # Ordinary drift (no baseline, or baseline matches destination) — today's exact behavior.
   if [[ $DRY_RUN -eq 1 ]]; then
     echo "  [STALE]    $label"
     (( CNT_MISSING++ )) || true
@@ -187,6 +245,7 @@ install_file() {
     cp "$src" "$dest"
     echo "  [UPDATED]  $label"
     (( CNT_UPDATED++ )) || true
+    sync_state_set "$label" "$(file_sha256 "$dest")"
   elif [[ "$IDEMPOTENCY" == "skip" ]]; then
     echo "  [SKIP]     $label (SHA-256 differs; use --force to overwrite)"
     (( CNT_OK++ )) || true
@@ -196,6 +255,7 @@ install_file() {
       cp "$src" "$dest"
       echo "  [UPDATED]  $label"
       (( CNT_UPDATED++ )) || true
+      sync_state_set "$label" "$(file_sha256 "$dest")"
     else
       echo "  [SKIPPED]  $label"
       (( CNT_OK++ )) || true
@@ -246,6 +306,7 @@ install_dir() {
       else
         echo "  [INSTALLED] $label/"
         (( CNT_UPDATED++ )) || true
+        sync_state_set "$label" "$(dir_sha256 "$dest")"
       fi
     fi
     return
@@ -256,20 +317,65 @@ install_dir() {
   if [[ "$src_hash" == "$dest_hash" ]]; then
     echo "  [OK]       $label/"
     (( CNT_OK++ )) || true
+    # Self-heal: bootstrap/refresh the baseline on every match so first-run installs
+    # need no manual seeding (accepted limitation: no baseline yet == trusted, not diverged).
+    [[ $DRY_RUN -eq 1 ]] || sync_state_set "$label" "$dest_hash"
     return
   fi
+
+  # _overwrite_dir_and_record: run the atomic swap, then record the new baseline
+  # only if the swap actually landed src's content at dest (mirrors success check
+  # since _overwrite_dir has no distinct failure exit code to branch on).
+  _overwrite_dir_and_record() {
+    _overwrite_dir "$src" "$dest" "$label"
+    if [[ -d "$dest" ]] && [[ "$(dir_sha256 "$dest")" == "$src_hash" ]]; then
+      sync_state_set "$label" "$src_hash"
+    fi
+  }
+
+  # Three-way check: is the destination's current hash the one we last synced,
+  # or has it been hand-edited out-of-band since then?
+  local baseline diverged=0
+  baseline="$(sync_state_get "$label")"
+  if [[ -n "$baseline" && "$baseline" != "$dest_hash" ]]; then
+    diverged=1
+  fi
+
+  if [[ $diverged -eq 1 ]]; then
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "  [DIVERGED] $label/"
+      (( CNT_DIVERGED++ )) || true
+      return
+    fi
+    echo "  [DIVERGED] $label/ (destination edited out-of-band since last sync)"
+    diff -rq "$dest" "$src" || true
+    if [[ $FORCE_DIVERGED -eq 1 ]]; then
+      _overwrite_dir_and_record
+    else
+      read -rp "  Overwrite $label/ despite out-of-band edit? [y/N] " ans
+      if [[ "${ans,,}" == "y" ]]; then
+        _overwrite_dir_and_record
+      else
+        echo "  [SKIPPED]  $label/ (out-of-band edit preserved — consider /promote-artifact to sync it back into the repo)"
+        (( CNT_DIVERGED++ )) || true
+      fi
+    fi
+    return
+  fi
+
+  # Ordinary drift (no baseline, or baseline matches destination) — today's exact behavior.
   if [[ $DRY_RUN -eq 1 ]]; then
     echo "  [STALE]    $label/"
     (( CNT_MISSING++ )) || true
   elif [[ $FORCE -eq 1 ]] || [[ "$IDEMPOTENCY" == "overwrite" ]]; then
-    _overwrite_dir "$src" "$dest" "$label"
+    _overwrite_dir_and_record
   elif [[ "$IDEMPOTENCY" == "skip" ]]; then
     echo "  [SKIP]     $label/ (SHA-256 differs; use --force to overwrite)"
     (( CNT_OK++ )) || true
   else
     read -rp "  Overwrite $label/? [y/N] " ans
     if [[ "${ans,,}" == "y" ]]; then
-      _overwrite_dir "$src" "$dest" "$label"
+      _overwrite_dir_and_record
     else
       echo "  [SKIPPED]  $label/"
       (( CNT_OK++ )) || true
@@ -364,19 +470,21 @@ scan_local_only() {
 echo "=== Claude artifact sync ==="
 echo "repo:   $REPO_DIR"
 echo "target: $CLAUDE_DIR"
-echo "mode:   $([ $DRY_RUN -eq 1 ] && echo dry-run || echo install) $([ $FORCE -eq 1 ] && echo +force)"
+echo "mode:   $([ $DRY_RUN -eq 1 ] && echo dry-run || echo install) $([ $FORCE -eq 1 ] && echo +force) $([ $FORCE_DIVERGED -eq 1 ] && echo +force-diverged)"
 echo ""
 
 echo "--- skills ---"
 names=$(yaml_get_names skills) || { echo "ERROR: manifest parse failed for skills" >&2; exit 1; }
-while IFS= read -r name; do
+# Read the manifest list on fd 3, not fd 0 (stdin) — install_dir's interactive
+# overwrite/diverged prompt lives in the loop body and needs real stdin free.
+while IFS= read -r name <&3; do
   [[ -n "$name" ]] || continue
   install_dir "$REPO_DIR/.claude/skills/$name" "$CLAUDE_DIR/skills/$name" "skills/$name"
-done <<< "$names"
+done 3<<< "$names"
 
 echo "--- commands ---"
 names=$(yaml_get_names commands) || { echo "ERROR: manifest parse failed for commands" >&2; exit 1; }
-while IFS= read -r name; do
+while IFS= read -r name <&3; do
   [[ -n "$name" ]] || continue
   src="$REPO_DIR/.claude/commands/$name"
   dest="$CLAUDE_DIR/commands/$name"
@@ -385,25 +493,25 @@ while IFS= read -r name; do
   else
     install_file "$src" "$dest" "commands/$name"
   fi
-done <<< "$names"
+done 3<<< "$names"
 
 echo "--- agents ---"
 names=$(yaml_get_names agents) || { echo "ERROR: manifest parse failed for agents" >&2; exit 1; }
-while IFS= read -r name; do
+while IFS= read -r name <&3; do
   [[ -n "$name" ]] || continue
   install_file "$REPO_DIR/.claude/agents/$name" "$CLAUDE_DIR/agents/$name" "agents/$name"
-done <<< "$names"
+done 3<<< "$names"
 
 echo "--- output_styles ---"
 names=$(yaml_get_names output_styles) || { echo "ERROR: manifest parse failed for output_styles" >&2; exit 1; }
-while IFS= read -r name; do
+while IFS= read -r name <&3; do
   [[ -n "$name" ]] || continue
   install_file "$REPO_DIR/.claude/output-styles/$name" "$CLAUDE_DIR/output-styles/$name" "output-styles/$name"
-done <<< "$names"
+done 3<<< "$names"
 
 echo "--- scripts ---"
 scripts=$(yaml_get_scripts) || { echo "ERROR: manifest parse failed for scripts" >&2; exit 1; }
-while IFS= read -r entry; do
+while IFS= read -r entry <&3; do
   [[ -n "$entry" ]] || continue
   name="${entry%%|*}"
   executable="${entry##*|}"
@@ -412,7 +520,7 @@ while IFS= read -r entry; do
   if [[ "$executable" == "true" && -f "$dest" && $DRY_RUN -eq 0 ]]; then
     chmod +x "$dest"
   fi
-done <<< "$scripts"
+done 3<<< "$scripts"
 
 echo "--- claude_md ---"
 portable=$(yaml_get_claude_md_portable) || { echo "ERROR: manifest parse failed for claude_md" >&2; exit 1; }
@@ -424,12 +532,12 @@ fi
 
 echo "--- plugins ---"
 plugins=$(yaml_get_plugins) || { echo "ERROR: manifest parse failed for plugins" >&2; exit 1; }
-while IFS= read -r entry; do
+while IFS= read -r entry <&3; do
   [[ -n "$entry" ]] || continue
   id="${entry%%|*}"
   marketplace="${entry##*|}"
   install_plugin "$id" "$marketplace"
-done <<< "$plugins"
+done 3<<< "$plugins"
 
 echo "--- local-only scan ---"
 scan_local_only skills   "$CLAUDE_DIR/skills"
@@ -443,5 +551,6 @@ echo "=== summary ==="
 echo "  OK:             $CNT_OK"
 echo "  updated:        $CNT_UPDATED"
 echo "  missing:        $CNT_MISSING"
+echo "  diverged:       $CNT_DIVERGED"
 echo "  local_only:     $CNT_LOCAL_ONLY"
 echo "  missing_plugin: $CNT_MISSING_PLUGIN"
