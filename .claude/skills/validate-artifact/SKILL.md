@@ -1,6 +1,6 @@
 ---
 name: validate-artifact
-description: Validate a user-wide Claude artifact for portability (no machine-specific content), dependency completeness, and terseness before promotion.
+description: Validate a user-wide Claude artifact for portability (no machine-specific content), dependency completeness, terseness, and coherence before promotion.
 triggers:
   - /validate-artifact
 args:
@@ -11,7 +11,7 @@ args:
 
 # validate-artifact
 
-Validates `<path>` against three criteria. Called standalone or by `/promote-artifact` before copying.
+Validates `<path>` against four criteria. Called standalone or by `/promote-artifact` before copying.
 
 ## Invocation
 
@@ -71,6 +71,19 @@ Report: `Terseness: <N>/10 — <one-line rationale>`
 - Rating ≥ 7 → **PASS**
 - Rating < 7 → **WARN** (non-blocking; promote can proceed with confirmation)
 
+## Step 4 — Coherent
+
+LLM assessment: read the whole artifact (frontmatter + body) together and check:
+- Frontmatter (`description`, `triggers`, `args`) accurately matches what the body actually does.
+- No internal contradictions — no step overrides or conflicts with an earlier one.
+- No dangling references — no mention of a file, tool, or step that doesn't exist in this artifact or its declared dependencies.
+- Single coherent purpose — flag if the artifact tries to do two unrelated things.
+
+Report: `Coherence: <N>/10 — <one-line rationale>`
+
+- Rating ≥ 7 → **PASS**
+- Rating < 7 → **WARN** (non-blocking; promote can proceed with confirmation)
+
 ---
 
 ## Output Format
@@ -90,6 +103,9 @@ Validating: <path>
 
 [PASS|WARN] Terse
   ✓ Terseness: 9/10 — single-purpose, no dead code
+
+[PASS|WARN] Coherent
+  ✓ Coherence: 9/10 — frontmatter matches body, no dangling refs
 
 Overall: PASS | WARN | FAIL
 ```

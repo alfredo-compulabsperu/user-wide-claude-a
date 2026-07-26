@@ -20,10 +20,10 @@ bash sync.sh --force      # Overwrite stale artifacts without prompting
 | Validate artifact before promotion | `/validate-artifact <path>` |
 | Extract one tool from an installed plugin (not the whole plugin) | `/copy-plugin-tool --plugin <hint> --tools <hint>` |
 
-`promote-artifact` and `validate-artifact` are repo-internal tooling for maintaining *this* repo's own
-artifact pipeline — deliberately absent from `manifest.yaml`/sync. Do not add manifest entries for them;
-that's not an oversight. `copy-plugin-tool` is a general-purpose skill and ships via `manifest.yaml` like
-any other.
+`promote-artifact`, `validate-artifact`, and `.claude/scripts/sync-state.sh` are repo-internal tooling for
+maintaining *this* repo's own artifact pipeline — deliberately absent from `manifest.yaml`/sync. Do not add
+manifest entries for them; that's not an oversight. `copy-plugin-tool` is a general-purpose skill and ships
+via `manifest.yaml` like any other.
 
 ## Key Files
 
@@ -46,3 +46,5 @@ any other.
 - Default `idempotency: skip` — SHA-256 mismatch is silently skipped unless `--force`
 - `python3` and `sha256sum` (or `shasum`) must be on PATH before sync runs
 - Plugins require `claude` CLI on PATH; install failures retry 3× with backoff
+- `~/.claude/.sync-state.json` tracks the last-synced SHA-256 per artifact (three-way divergence
+  detection) — don't hand-edit or delete it; `sync.sh`/`promote-artifact` self-heal it on every run
