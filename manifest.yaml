@@ -11,6 +11,7 @@ skills:
   - name: copy-plugin-tool
   - name: ship
   - name: gh-pr-update
+  - name: gh-issue-create
 
 commands:
   - name: open-claude.md
