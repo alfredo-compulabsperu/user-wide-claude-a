@@ -1,0 +1,32 @@
+name: Bug Report
+description: "One bug per issue. Multiple bugs → separate issues (SRP)."
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **One bug per issue (SRP).** Found multiple bugs? Open a separate issue for each.
+        **Be minimal (KISS).** Strip reproduction steps down to the essential trigger.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Minimal reproduction steps. Every step must be necessary to trigger the bug.
+      placeholder: "1. ...\n2. ...\n3. Bug occurs"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: One or two sentences is usually enough.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / environment
+      placeholder: "e.g. v1.2.3, Ubuntu 24.04, Node 20"
+    validations:
+      required: false

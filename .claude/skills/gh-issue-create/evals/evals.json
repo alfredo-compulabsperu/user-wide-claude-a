@@ -1,0 +1,23 @@
+{
+  "skill_name": "gh-issue-create",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Set up gh-issue-create for this project, then create a bug issue: the --install command prints '✓ install complete' even when .github/ is not writable — templates were never created.",
+      "expected_output": "Install completes and reports N templates installed. A bug issue draft is created using the bug.yml template with all required fields filled. Review step runs and reports findings. Title is imperative mood and ≤ 72 chars.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I want to track adding a --dry-run flag to /gh-issue-create — show me the filled issue before it creates anything. Open a feature request for that.",
+      "expected_output": "Feature template is selected. Draft fills 'Problem to solve' and 'Proposed solution' with focused, non-speculative content. Scope check boxes are noted. Review step enforces YAGNI and KISS. Final draft is clean and ready to submit.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "File a GitHub issue covering two things: (1) sync.sh shows no progress when syncing large repos, and (2) we should add a --verbose flag to see what's being copied.",
+      "expected_output": "Skill detects two topics and asks whether to split (SRP). Upon confirmation, creates two separate issues — one bug/chore per topic. Each draft uses the appropriate template and covers only one concern.",
+      "files": []
+    }
+  ]
+}
