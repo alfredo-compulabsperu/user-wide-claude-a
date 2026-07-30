@@ -36,6 +36,8 @@ scripts:
     executable: true
   - name: rename-tmux-window.sh
     executable: true
+  - name: vm-cleanup.sh
+    executable: true
 
 claude_md:
   portable: true
