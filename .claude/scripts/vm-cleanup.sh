@@ -90,9 +90,13 @@ _rescue_and_remove_worktree() {
   rescue="$HOME/.claude/cleanup-rescue/$(basename "$wt")-$(date +%Y%m%d-%H%M%S)"
   while IFS= read -r -d '' f; do
     rel="${f#"$wt"/}"
-    mkdir -p "$rescue/$(dirname "$rel")"
-    mv "$f" "$rescue/$rel"
-  done < <(find "$wt" \( "${PROTECTED_EXPR[@]}" \) -prune -print0 2>/dev/null)
+    # A failed rescue MUST abort before the removal below — _confirm's
+    # `|| true` context suppresses set -e inside this function.
+    if ! mkdir -p "$rescue/$(dirname "$rel")" || ! mv "$f" "$rescue/$rel"; then
+      echo "rescue FAILED for ${f} -- aborting, worktree left in place"
+      return 1
+    fi
+  done < <(find "$wt" -mindepth 1 \( "${PROTECTED_EXPR[@]}" \) -prune -print0 2>/dev/null)
   echo "protected files rescued to: $rescue"
   git -C "$repo" worktree remove --force "$wt"
 }

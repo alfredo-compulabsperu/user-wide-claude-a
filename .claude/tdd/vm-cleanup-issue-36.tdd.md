@@ -82,3 +82,11 @@ RED `f096c96` (5 FAIL on baseline for the two intended bugs) → GREEN `e42c5c8`
 (9/9 PASS, same test unchanged) → no separate refactor commit (DRY extraction of
 `PROTECTED_EXPR` was itself part of the minimal fix) → manifest+sync `6406569`
 (repo↔VM sha256 identical).
+
+Pre-merge review hardening: a failed `mkdir`/`mv` during rescue now aborts before
+`git worktree remove --force` (set -e is suppressed inside `_confirm`'s `|| true`
+pipeline, so the guard must be explicit), and the rescue `find` gained `-mindepth 1`
+so a worktree directory itself named like a protected pattern (e.g. `*secret*`)
+can't be moved wholesale. Sandbox test rerun after hardening: 9/9 PASS. The
+rescue-failure abort path itself is untested (simulating `mv` failure needs a
+second sandbox scenario — deferred).
