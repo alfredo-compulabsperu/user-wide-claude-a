@@ -5,8 +5,10 @@
 #   SAFE    auto-executes in --clean mode (low risk, recoverable)
 #   CONFIRM skipped in --clean mode unless --yes is also passed
 #
-# Protected files (NEVER touched under any operation):
+# Protected files (never deleted; at any depth):
 #   .env  .env.*  *.local.json  serviceAccountKey*  *.pem  *.key  *secret*  *credential*
+# When a removable worktree contains protected files, they are moved to
+# ~/.claude/cleanup-rescue/<worktree>-<timestamp>/ before the worktree is removed.
 #
 # Usage:
 #   vm-cleanup.sh              scan only; print targets with sizes
@@ -65,12 +67,34 @@ _confirm() {
 
 _skip() { printf "  ${R}[SKIP]${N}    %s\n" "$1"; }
 
+# Single source of truth for the protected-name predicates; used by both the
+# detection probe and the rescue pass so they can never disagree on depth or
+# name list again (issue #36).
+PROTECTED_EXPR=(
+  -name ".env" -o -name ".env.*" -o -name "*.local.json"
+  -o -name "serviceAccountKey*" -o -name "*.pem" -o -name "*.key"
+  -o -name "*secret*" -o -name "*credential*"
+)
+
 _has_protected() {
-  find "$1" \( \
-    -name ".env" -o -name ".env.*" -o -name "*.local.json" \
-    -o -name "serviceAccountKey*" -o -name "*.pem" -o -name "*.key" \
-    -o -name "*secret*" -o -name "*credential*" \
-  \) -maxdepth 5 -print -quit 2>/dev/null | grep -q .
+  find "$1" \( "${PROTECTED_EXPR[@]}" \) -print -quit 2>/dev/null | grep -q .
+}
+
+# Move every protected file/dir out of the worktree into a timestamped rescue
+# dir (preserving worktree-relative paths), then unregister the worktree.
+# --force is required (rescuing the files makes the tree dirty to git) and
+# safe: eligibility gates — unlocked, clean, pushed, not self — already passed.
+_rescue_and_remove_worktree() {
+  local wt="$1" repo="$2"
+  local rescue f rel
+  rescue="$HOME/.claude/cleanup-rescue/$(basename "$wt")-$(date +%Y%m%d-%H%M%S)"
+  while IFS= read -r -d '' f; do
+    rel="${f#"$wt"/}"
+    mkdir -p "$rescue/$(dirname "$rel")"
+    mv "$f" "$rescue/$rel"
+  done < <(find "$wt" \( "${PROTECTED_EXPR[@]}" \) -prune -print0 2>/dev/null)
+  echo "protected files rescued to: $rescue"
+  git -C "$repo" worktree remove --force "$wt"
 }
 
 # ── 1. disk overview ──────────────────────────────────────────────────────────
@@ -237,15 +261,8 @@ while IFS= read -r git_dir; do
     _add "$wt"
 
     if _has_protected "$wt"; then
-      _confirm "empty non-protected contents + git worktree prune (protected files present): ${wt}" \
-        bash -c "
-          find '${wt}' -mindepth 1 \
-            ! \( -name '.env' -o -name '.env.*' -o -name '*.local.json' \
-                 -o -name 'serviceAccountKey*' -o -name '*.pem' -o -name '*.key' \
-                 -o -name '*secret*' -o -name '*credential*' -o -name '.git' \) \
-            -delete 2>/dev/null || true
-          git -C '${repo}' worktree prune
-        "
+      _confirm "rescue protected files + git worktree remove (protected files present): ${wt}" \
+        _rescue_and_remove_worktree "$wt" "$repo"
     else
       _confirm "git worktree remove ${wt}" \
         bash -c "git -C '${repo}' worktree remove '${wt}'"
