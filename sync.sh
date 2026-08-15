@@ -120,7 +120,7 @@ import yaml, os, sys
 try:
   d = yaml.safe_load(open(os.environ['MANIFEST_PATH']))
   issues = []
-  for section in ['skills', 'commands', 'agents', 'scripts', 'output_styles']:
+  for section in ['skills', 'commands', 'agents', 'scripts', 'output_styles', 'rules']:
     for i, entry in enumerate(d.get(section, [])):
       if isinstance(entry, dict):
         if not entry.get('name'):
@@ -495,6 +495,13 @@ while IFS= read -r name <&3; do
   fi
 done 3<<< "$names"
 
+echo "--- rules ---"
+names=$(yaml_get_names rules) || { echo "ERROR: manifest parse failed for rules" >&2; exit 1; }
+while IFS= read -r name <&3; do
+  [[ -n "$name" ]] || continue
+  install_file "$REPO_DIR/.claude/rules/$name" "$CLAUDE_DIR/rules/$name" "rules/$name"
+done 3<<< "$names"
+
 echo "--- agents ---"
 names=$(yaml_get_names agents) || { echo "ERROR: manifest parse failed for agents" >&2; exit 1; }
 while IFS= read -r name <&3; do
@@ -543,6 +550,7 @@ echo "--- local-only scan ---"
 scan_local_only skills   "$CLAUDE_DIR/skills"
 scan_local_only commands "$CLAUDE_DIR/commands"
 scan_local_only agents   "$CLAUDE_DIR/agents"
+scan_local_only rules    "$CLAUDE_DIR/rules"
 scan_local_only scripts  "$CLAUDE_DIR/scripts"
 scan_local_only output_styles "$CLAUDE_DIR/output-styles"
 
