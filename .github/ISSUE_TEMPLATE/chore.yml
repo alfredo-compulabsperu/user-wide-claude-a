@@ -1,0 +1,33 @@
+name: Task / Chore
+description: "Technical task, refactor, or maintenance. One task per issue (SRP). Check for duplicates first (DRY)."
+labels:
+  - chore
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **One task per issue (SRP).** Break large refactors into focused, independently reviewable chunks.
+        **Check for duplicates (DRY).** Search existing issues before opening.
+  - type: textarea
+    id: task
+    attributes:
+      label: Task
+      description: What needs to be done? Be specific and concrete (KISS).
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      description: How will we know this is complete? List observable outcomes.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Scope check
+      options:
+        - label: This is a single, focused task (not a multi-step epic)
+          required: true
+        - label: I confirmed this is not already tracked elsewhere (DRY)
+          required: true

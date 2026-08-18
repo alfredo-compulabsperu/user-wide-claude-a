@@ -1,0 +1,33 @@
+name: Feature Request
+description: "One feature per issue (SRP). No bundled requests. No speculative extensions (YAGNI)."
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **One feature per issue (SRP).** Split multi-part requests into separate issues.
+        **No speculative scope (YAGNI).** Request only what you need now, not "while we're at it".
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What specific, concrete problem does this address? Avoid restating the solution here.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Simplest approach that solves the problem. No over-engineering (KISS).
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Scope check
+      options:
+        - label: This is a single, well-scoped feature (not a bundle of related ideas)
+          required: true
+        - label: I searched existing issues — this is not already tracked (DRY)
+          required: true
