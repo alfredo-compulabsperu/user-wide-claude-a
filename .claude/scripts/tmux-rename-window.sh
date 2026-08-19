@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# rename-tmux-window.sh — rename the current tmux window; errors if not in tmux or name conflicts
+# tmux-rename-window.sh — rename the current tmux window; errors if not in tmux or name conflicts
 
 set -euo pipefail
 
@@ -10,7 +10,7 @@ if [[ -z "$NAME" ]]; then
   # folder name; otherwise use the worktree folder name as-is.
   WORKTREE_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || true)
   if [[ -z "$WORKTREE_ROOT" ]]; then
-    echo "Usage: rename-tmux-window.sh <name>" >&2
+    echo "Usage: tmux-rename-window.sh <name>" >&2
     exit 1
   fi
   WORKTREE_FOLDER=$(basename "$WORKTREE_ROOT")

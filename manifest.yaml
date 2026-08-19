@@ -17,7 +17,7 @@ commands:
   - name: open-claude.md
   - name: open-gh-issue.md
   - name: open-gh-pr.md
-  - name: rename-tmux-window.md
+  - name: tmux-rename-window.md
   - name: session-summary.md
 
 agents: []
@@ -38,7 +38,7 @@ scripts:
     executable: true
   - name: open-gh-pr.sh
     executable: true
-  - name: rename-tmux-window.sh
+  - name: tmux-rename-window.sh
     executable: true
   - name: vm-cleanup.sh
     executable: true

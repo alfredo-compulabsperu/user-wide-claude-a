@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# rename-tmux-window.test.sh — integration tests for rename-tmux-window.sh
+# tmux-rename-window.test.sh — integration tests for tmux-rename-window.sh
 # Exits 0 if all tests pass, 1 if any test fails.
 
 set -euo pipefail
 
-SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/rename-tmux-window.sh"
+SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/tmux-rename-window.sh"
 MOCK_BIN="$(mktemp -d)"
 
 trap 'rm -rf "$MOCK_BIN"' EXIT

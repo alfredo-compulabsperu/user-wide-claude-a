@@ -15,7 +15,7 @@
 | Error handling | `sync.sh:47-49,158-162` | Hard preflight checks via `[[ ]] \|\| { echo "ERROR: ..." >&2; exit 1; }`; soft failures use `WARN:` to stderr + counter increment, never a hard exit |
 | Logging | `sync.sh:170,178-204` | Two-space-indented bracketed tags (`[OK]`, `[UPDATED]`, `[INSTALLED]`, `[SKIP]`, `[STALE]`) |
 | Data access | `sync.sh:64-72,102-108` | python3 heredoc with single-quoted `<<'PYEOF'` + env-var passing (avoids shell injection — see "C1"/"C2" comments at `sync.sh:51,142`) |
-| Tests | `.claude/tests/scripts/rename-tmux-window.test.sh` | `run_test(name, pass\|fail)` counter helper, `bash -n` syntax check as test 1, mock binaries in `mktemp -d` prepended to `PATH`, summary + `exit 1` on any failure |
+| Tests | `.claude/tests/scripts/tmux-rename-window.test.sh` | `run_test(name, pass\|fail)` counter helper, `bash -n` syntax check as test 1, mock binaries in `mktemp -d` prepended to `PATH`, summary + `exit 1` on any failure |
 
 No existing pattern for a JSON (vs. YAML) state file in this repo — using stdlib `json` directly since the schema is a flat map; not worth pulling in YAML semantics for this.
 
@@ -58,7 +58,7 @@ No existing pattern for a JSON (vs. YAML) state file in this repo — using stdl
 ### Task 4: Tests
 
 - **Action**: `sync-state.test.sh` — get/set round trip, get-on-missing-file. `sync.test.sh` — build a scratch repo dir + scratch `manifest.yaml`, run with `HOME=<tempdir>` so both `sync.sh`'s `$HOME/.claude` and `sync-state.sh`'s state file resolve into the sandbox (no code changes needed for test isolation; the real `~/.claude/` is never touched). Cover: fresh install records baseline; ordinary drift with no baseline; ordinary drift with baseline==dest; diverged reports `[DIVERGED]`; plain `--force` does NOT overwrite a diverged file; `--force-diverged` does; declining the diverged prompt (empty stdin) leaves the file untouched and reports `[SKIPPED]`.
-- **Mirror**: `rename-tmux-window.test.sh` harness exactly.
+- **Mirror**: `tmux-rename-window.test.sh` harness exactly.
 - **Validate**: `bash .claude/tests/scripts/sync-state.test.sh && bash .claude/tests/scripts/sync.test.sh`, plus a full regression run of the existing sibling `*.test.sh` files.
 
 ### Task 5: Docs
