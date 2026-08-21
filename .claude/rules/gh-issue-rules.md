@@ -34,3 +34,12 @@ When creating or reviewing a GitHub issue, enforce all four principles.
 - All fields marked `required: true` must be filled with real content (not placeholder text, not "N/A" without explanation)
 - Title must not duplicate the template name (title = "Bug Report" is invalid)
 - Remove any unfilled optional sections rather than leaving them blank
+
+## Assessment / Research Issues (LLM-Executed)
+
+When the issue scopes a research or assessment task — especially one an LLM will pick up and execute:
+
+- State outcome constraints, not tool/strategy prescriptions — e.g. "must survive an independent critique pass" instead of "iterate 3 times using workflow X"
+- If process rigor matters, spell it out as an explicit "Rigor requirements" block, separate from Definition of Done: independent generation (no anchoring on the first idea), ranking/scoring criteria defined *before* scoring, at least one critique-and-refine pass per option, and any claim that can't be independently verified flagged (e.g. `⚠️ verify:`) rather than presented as confirmed
+- Whenever the task involves LLM-produced output of any kind, explicitly guard against hallucination, stale/outdated assumptions, goal drift from stated requirements, and silent requirement bypass — well-known LLM failure modes, not specific to research
+- Keep rigor requirements distinct from Definition of Done: rigor describes *how the work must be conducted*, DoD lists *what must exist* when done
