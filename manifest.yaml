@@ -22,6 +22,10 @@ commands:
 
 agents: []
 
+rules:
+  - name: gh-issue-rules.md
+  - name: web-research-tool-selection.md
+
 output_styles:
   - name: plain-terse-glossed.md
   - name: terse-technical.md
@@ -35,6 +39,8 @@ scripts:
   - name: open-gh-pr.sh
     executable: true
   - name: rename-tmux-window.sh
+    executable: true
+  - name: vm-cleanup.sh
     executable: true
 
 claude_md:
