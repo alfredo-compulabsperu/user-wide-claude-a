@@ -48,3 +48,7 @@ via `manifest.yaml` like any other.
 - Plugins require `claude` CLI on PATH; install failures retry 3× with backoff
 - `~/.claude/.sync-state.json` tracks the last-synced SHA-256 per artifact (three-way divergence
   detection) — don't hand-edit or delete it; `sync.sh`/`promote-artifact` self-heal it on every run
+
+## GitHub Issue Creation
+
+Always use `/gh-issue-create` when opening GitHub issues. Never run `gh issue create` directly.
