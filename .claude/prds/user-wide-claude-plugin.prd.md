@@ -5,7 +5,9 @@ A solo developer running Claude Code across multiple machines ships user-wide to
 
 ## Evidence
 - Assumption — needs validation via real multi-machine usage after install. No concrete incident triggered this; it's an anticipated architectural improvement.
-- Confirmed via official docs (code.claude.com/docs/en/plugins-reference.md, plugins.md): plugins natively support skills, commands, agents, hooks, MCP/LSP servers, and a semver `version` field; they do **not** support loading a plugin-root `CLAUDE.md` as project context, and there is no manifest field for a `rules/` directory. A custom installer is required for those two artifact types.
+- Confirmed via official docs (code.claude.com/docs/en/plugins-reference.md, plugins.md): plugins natively support skills, commands, agents, hooks, MCP/LSP servers, output styles, and a semver `version` field; they do **not** support loading a plugin-root `CLAUDE.md` as project context, and there is no manifest field for a `rules/` directory. A custom installer is required for those two artifact types.
+- Confirmed: auto-update is **not** automatic for a community/self-hosted marketplace (only the official marketplace auto-updates by default) — a self-hosted plugin repo needs to document this explicitly rather than imply automatic updates.
+- Validated by issue #42's assessment (5 independently-drafted proposals, critiqued, scored against pre-defined criteria): this PRD's hypothesis (plugin + custom installer command) was selected as finalist. See [assessment](https://github.com/alfredo-compulabsperu/user-wide-claude-a/issues/42#issuecomment-5376148086) and follow-up issue #44.
 
 ## Users
 - **Primary**: solo developer (you), managing Claude Code setup across your own machines
@@ -28,6 +30,7 @@ We'll know we're right when **a machine can install/update this tooling through 
 - `/install-claude-tools` interactive installer applying `CLAUDE.md` + rules at user or repo scope
 - `promote-artifact` consolidated to one skill: accepts a named Claude Code tool to import/promote, or — if none given — interactively asks whether to scan the repo or user-wide `~/.claude` for importable/updated tools
 - CI/CD step that bumps `plugin.json` semver on merge
+- Any script referenced by a migrated command/hook resolves its path via `${CLAUDE_PLUGIN_ROOT}`, not `git rev-parse --show-toplevel` — the latter breaks once running from an installed plugin location rather than a live repo checkout
 
 **Out of scope**
 - Team/shared distribution — solo use only
@@ -39,8 +42,8 @@ We'll know we're right when **a machine can install/update this tooling through 
 ## Delivery Milestones
 | # | Milestone | Outcome | Status | Plan |
 |---|---|---|---|---|
-| 1 | Plugin manifest scaffold | Repo has a valid `plugin.json` (semver) with existing skills/commands/agents/hooks/scripts declared and installable via the plugin mechanism | pending | — |
-| 2 | CLAUDE.md/rules installer | `/install-claude-tools` lets the user apply CLAUDE.md + rules at user or repo scope, on demand | pending | — |
+| 1 | Plugin manifest scaffold | Repo has a valid `plugin.json` (semver) with existing skills/commands/agents/hooks/scripts declared and installable via the plugin mechanism | pending | #44 |
+| 2 | CLAUDE.md/rules installer | `/install-claude-tools` lets the user apply CLAUDE.md + rules at user or repo scope, on demand | pending | #44 |
 | 3 | `promote-artifact` consolidation | Single skill accepts a named tool to import/promote, or interactively asks repo-vs-user-wide scan when none given | pending | — |
 | 4 | Repo-agnostic enforcement | Every bundled artifact is validated as repo-agnostic before being included in a plugin release | pending | — |
 | 5 | CI/CD semver automation | Merges bump `plugin.json` version automatically; release published with a changelog | pending | — |
@@ -57,6 +60,9 @@ We'll know we're right when **a machine can install/update this tooling through 
 | CLAUDE.md/rules installer silently overwrites user edits on target machine | Medium | Medium | Installer always prompts/diffs before applying, matching `sync.sh`'s existing idempotency pattern |
 | Confusion between old `sync.sh` path and new plugin path during transition | Medium | Low | Document both paths clearly until the deprecation open question is resolved |
 | `copy-plugin-tool` and similar user-wide-only tools stay untracked by this repo | Medium | Medium | Milestone 4's repo-agnostic enforcement should also catch tools that exist in `~/.claude/` but never made it into the repo |
+| **Blocking**: `sync.sh`'s `claude plugin install <id> --marketplace <name>` call is rejected by the current CLI (issue #39) | High (confirmed reproducing) | High — blocks any plugin install/update path | Must be fixed before Milestone 1 work starts; corrected syntax is `claude plugin install <id>@<marketplace-name>` |
+| `/install-claude-tools push` only works when the plugin is installed via local dev-source (a marketplace-fetched copy has no writable path back to the repo) | Medium | Medium | ⚠️ verify: `${CLAUDE_PLUGIN_ROOT}` (or equivalent) resolves to a writable path under local/dev-source install — unconfirmed as of the #42 assessment; accepted tradeoff otherwise |
+| `push` bypasses branch/PR ceremony (direct write-back + confirmation prompt), diverging from `promote-artifact --git`'s fuller pipeline | Low | Low | Accepted tradeoff at solo-developer, own-machines-only scope |
 
 ---
 *Status: DRAFT — requirements only. Implementation planning pending via /plan.*
