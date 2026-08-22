@@ -41,6 +41,9 @@ via `manifest.yaml` like any other.
 `skills`, `commands`, `agents`, `scripts`, `output_styles`, `plugins`, `claude_md` → maps 1:1 to
 `~/.claude/` subdirectories. Adding an entry without the file causes `[MISSING]` in dry-run.
 
+## GitHub Issue Creation
+Always use `/gh-issue-create` when opening GitHub issues. Never run `gh issue create` directly.
+
 ## Gotchas
 
 - Default `idempotency: skip` — SHA-256 mismatch is silently skipped unless `--force`
