@@ -40,7 +40,7 @@ def write_rule(rules: Path, name: str, text: str) -> None:
     (rules / name).write_text(text)
 
 
-def run_hook(tmp: Path, payload, rules: Path | None = None):
+def run_hook(tmp: Path, payload, rules: Path | str | None = None):
     """Invoke the hook once. `payload` may be a dict or a raw string."""
     env = {
         **os.environ,
@@ -127,6 +127,17 @@ def test_dedup_is_scoped_per_session(tmp_path):
     write_rule(tmp_path / "rules", "ts.md", TS_RULE)
     assert "TS BODY" in context_of(run_hook(tmp_path, write_payload("/w/a.ts", session="s1")))
     assert "TS BODY" in context_of(run_hook(tmp_path, write_payload("/w/a.ts", session="s2")))
+
+
+# ── Dev override: a repo's settings.json can point the scan at itself ────────
+
+def test_rule_dirs_env_expands_variables(tmp_path, monkeypatch):
+    """settings.json env values reach the hook unexpanded; the hook must expand them."""
+    write_rule(tmp_path / "repo" / ".claude" / "rules", "ts.md", TS_RULE)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path / "repo"))
+    r = run_hook(tmp_path, write_payload("/w/a.ts"), rules="${CLAUDE_PROJECT_DIR}/.claude/rules")
+    assert r.returncode == 0
+    assert "TS BODY" in context_of(r)
 
 
 # ── Failure modes: never block the tool, never fail silently ─────────────────
