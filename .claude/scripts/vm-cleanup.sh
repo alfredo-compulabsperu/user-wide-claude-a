@@ -49,6 +49,8 @@ else
 fi
 
 TOTAL_BYTES=0
+FAILURES=0
+FAILED_ACTIONS=()
 
 _section() { printf "\n${B}=== %s ===${N}\n" "$1"; }
 _bytes()   { du -sb "$1" 2>/dev/null | cut -f1 || echo 0; }
@@ -58,7 +60,10 @@ _add()     { TOTAL_BYTES=$(( TOTAL_BYTES + $(_bytes "$1") )); }
 _safe() {
   local desc="$1"; shift
   printf "  ${G}[SAFE]${N}    %s\n" "$desc"
-  $CLEAN && { "$@" 2>&1 | sed 's/^/    /' || true; }
+  if $CLEAN && ! "$@" 2>&1 | sed 's/^/    /'; then
+    FAILURES=$(( FAILURES + 1 ))
+    FAILED_ACTIONS+=("$desc")
+  fi
   return 0
 }
 
@@ -66,7 +71,10 @@ _confirm() {
   local desc="$1"; shift
   if $CLEAN && $RISKY; then
     printf "  ${Y}[RISKY]${N} %s\n" "$desc"
-    "$@" 2>&1 | sed 's/^/    /' || true
+    if ! "$@" 2>&1 | sed 's/^/    /'; then
+      FAILURES=$(( FAILURES + 1 ))
+      FAILED_ACTIONS+=("$desc")
+    fi
   elif $CLEAN; then
     printf "  ${Y}[RISKY]${N} ${R}(skipped -- rerun with --risky)${N} %s\n" "$desc"
   else
@@ -131,6 +139,7 @@ _tree_is_active() {
 # dir (preserving worktree-relative paths), then unregister the worktree.
 # --force is required (rescuing the files makes the tree dirty to git) and
 # safe: eligibility gates — unlocked, clean, pushed, not self — already passed.
+# shellcheck disable=SC2329 # invoked indirectly: passed as "$@" to _confirm below
 _rescue_and_remove_worktree() {
   local wt="$1" repo="$2"
   local rescue f rel
@@ -368,3 +377,13 @@ elif ! $RISKY; then
   printf "\n  ${Y}SAFE actions executed. RISKY targets were listed but skipped.${N}\n"
   printf "  Rerun with ${B}--clean --risky${N} to execute RISKY targets.\n"
 fi
+
+if (( FAILURES > 0 )); then
+  printf "\n  ${R}Failed actions (%d):${N}\n" "$FAILURES"
+  for action in "${FAILED_ACTIONS[@]}"; do
+    printf "    - %s\n" "$action"
+  done
+  exit 1
+fi
+
+exit 0

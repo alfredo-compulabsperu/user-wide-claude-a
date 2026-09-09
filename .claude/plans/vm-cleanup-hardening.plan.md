@@ -222,7 +222,7 @@ above: `/validate-artifact .claude/scripts/vm-cleanup.sh` and
 **Correctness**
 - [ ] **AC5** — A second identical `--clean --risky` run performs no further destructive
   action and exits 0.
-- [ ] **AC6** — A failing action causes non-zero exit and appears in the Summary.
+- [x] **AC6** — A failing action causes non-zero exit and appears in the Summary.
 - [ ] **AC7** — `18ceb9d` is fully landed on **this branch**: the guard, the promoted test,
   the runner, and the CI workflow are all present. Reaching `develop` is a post-plan PR
   merge, outside Tasks 1–7 — this AC closes at branch level here, and for real on that merge.

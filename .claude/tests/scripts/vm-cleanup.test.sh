@@ -261,6 +261,19 @@ grep -q "SAFE" <<<"$OUT_HELP" && grep -q "RISKY" <<<"$OUT_HELP" \
   && pass "--help names both tiers (SAFE/RISKY) with an example target each" \
   || fail "--help names both tiers (SAFE/RISKY) with an example target each"
 
+# ── Run 8: Task 4 — a failing action causes non-zero exit + Summary entry ───
+FAILSTUB="$SANDBOX/stub-bin-fail"
+mkdir -p "$FAILSTUB"
+printf '#!/bin/sh\nexit 1\n' > "$FAILSTUB/sudo"   # every SAFE apt/journald action goes through sudo
+chmod +x "$FAILSTUB/sudo"
+
+OUT_FAILINJECT=$(cd "$SANDBOX" && PATH="$FAILSTUB:$PATH" bash "$SCRIPT" --clean 2>&1)
+RC_FAILINJECT=$?
+
+[[ $RC_FAILINJECT -ne 0 ]] && grep -qi "Failed actions" <<<"$OUT_FAILINJECT" \
+  && pass "a failing SAFE action causes non-zero exit and appears in the Summary" \
+  || fail "a failing SAFE action causes non-zero exit and appears in the Summary"
+
 echo
 if [[ $FAIL -eq 0 ]]; then
   echo "RESULT: GREEN (all assertions passed)"
