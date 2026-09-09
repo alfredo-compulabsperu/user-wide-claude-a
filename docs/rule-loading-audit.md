@@ -323,7 +323,7 @@ M5's cost is set entirely by its dedup key. Four options; only one is both corre
 | `guidancePeriodic` | `(rule, session)` + counter | calls 1, N+1, 2N+1… | event count — **unbounded** | cadence is blind to *which* subject |
 | **`per_subject`** | **`(rule, subject)`** | **once per distinct subject** | **distinct subjects — bounded by breadth** | **use this** |
 
-Measured on a 40-edit trace across 3 files (`scratchpad/throttle_demo.py`, runnable):
+Measured on a 40-edit trace across 3 files (`.claude/PRPs/examples/throttle_demo.py`, runnable):
 
 | Strategy | Fires | Tokens |
 |---|---:|---:|

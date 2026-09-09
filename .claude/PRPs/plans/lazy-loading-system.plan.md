@@ -34,7 +34,7 @@ So that rules are neither silently absent when they apply nor re-billed on every
 | **P0** | `manifest.yaml` | 25-45 | Section shape; `scripts` shows the `executable: true` flag that `hooks` needs |
 | **P1** | `~/.claude/hooks/ecc-typescript-rule-inject.py` | 1-46 | The injector contract to generalize (payload parse → filter → read bodies → `hookSpecificOutput`) |
 | **P1** | `~/.claude/hooks/confirm-before-test-changes-rule-inject.py` | 12-24 | The second injector; its `COVERED_SUFFIXES` is the superset causing double-billing |
-| **P1** | `scratchpad/throttle_demo.py` | all | Runnable reference for the three dedup strategies; `per_subject()` is what M5 uses |
+| **P1** | `.claude/PRPs/examples/throttle_demo.py` | all | Runnable reference for the three dedup strategies; `per_subject()` is what M5 uses |
 | **P2** | `~/.claude/rules/rule-authoring-format.md` | all | Existing authoring convention the new `on:` block must extend, not contradict |
 | **P2** | `~/.claude/scripts/gh-branch-guard.sh` | 1-40 | Broken `deny()` to fix in Phase 5 |
 
@@ -75,7 +75,7 @@ def main():
 
 ### DEDUP_PER_SUBJECT
 ```python
-# SOURCE: scratchpad/throttle_demo.py
+# SOURCE: .claude/PRPs/examples/throttle_demo.py
 def per_subject(kind: str, subject: str, session_id: str) -> bool:
     key = hashlib.sha1(subject.encode()).hexdigest()[:12]
     return once(f"{kind}--{key}", session_id)   # O_CREAT|O_EXCL marker
