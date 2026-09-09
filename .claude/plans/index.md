@@ -16,3 +16,4 @@ whose file has been deleted or moved.
 | [portability-loop-runbook.md](portability-loop-runbook.md) | Loop runbook (sequential, safe mode) for the same portability PRD | complete |
 | [sync-state-divergence-detection.plan.md](sync-state-divergence-detection.plan.md) | Three-way divergence detection (`sync-state.sh`) for `sync.sh` and `promote-artifact` | complete |
 | [vm-cleanup-issue-36.plan.md](vm-cleanup-issue-36.plan.md) | Issue #36 — vm-cleanup.sh husk fix, depth-mismatch fix, track script in repo | complete |
+| [lazy-loading-loop-runbook.md](lazy-loading-loop-runbook.md) | Loop runbook (sequential, fast mode, hybrid human gates) driving `.claude/PRPs/plans/lazy-loading-system.plan.md` | pending |

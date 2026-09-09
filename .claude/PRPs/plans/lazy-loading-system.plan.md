@@ -14,14 +14,14 @@ So that rules are neither silently absent when they apply nor re-billed on every
 
 **Current:** 24 user-wide rules and 12 hooks live in an unversioned `~/.claude`. Native `paths:` gating is Read-only, so no rule can govern an edit. Two injectors patch around this with no dedup, costing ~2,150 tok per JS/TS edit (~86,000 over 40 edits) and firing *after* the write. Five proxy stubs have no mechanical backing at all.
 
-**Target:** All rule/lazy/hook artifacts tracked in this repo and installed by `sync.sh`. One `PreToolUse` injector loads any rule whose declared trigger matches — path glob, tool, or command — before the action, deduped per `(rule, subject)`, at ~6,450 tok on the same 40-edit trace.
+**Target:** Every user-wide file this plan changes is brought into the repo *before* it is changed, so no edit goes untracked — and nothing else is brought in. One `PreToolUse` injector loads any rule whose declared trigger matches — path glob, tool, or command — before the action, deduped per `(rule, subject)`, at ~6,450 tok on the same 40-edit trace.
 
 ## Metadata
 
 - **Complexity**: **XL** — split into 6 phases below; Phases 1-3 are the viable first increment
 - **Source PRD**: N/A (derived from `docs/rule-loading-audit.md`)
 - **PRD Phase**: N/A
-- **Estimated Files**: ~24 (3 created, ~8 modified, ~13 deleted)
+- **Estimated Files**: ~72 (48 imported verbatim in Task 1.3, 3 created, ~8 modified, ~13 deleted)
 
 ---
 
@@ -129,11 +129,14 @@ deny() {
 - *`git init ~/.claude`* — solves versioning only, forces a hazardous `.gitignore` (plugin cache, session transcripts, a `settings.local.json` that has historically held a live PAT), and gives no portability.
 - *Patch the two injectors in place* — the fix is a strict subset of M5; doing both duplicates work.
 
-**Scope:** manifest/sync support for `hooks` + `lazy`; import current artifacts; build and cut over to `lazy-rule-inject.py`; reclassify every rule by trigger; fix the enforcement bugs; delete dead weight.
+**Scope:** manifest/sync support for `hooks` + `lazy`; import the user-wide files this plan changes — **only those** (2026-09-09 decision); build and cut over to `lazy-rule-inject.py`; reclassify every rule by trigger; fix the enforcement bugs; delete dead weight.
+
+**Execution principle — repo is the write target.** After Task 1.3, every change in Phases 1–6 lands on the repo copy under `.claude/` and is propagated to `~/.claude/` by `bash sync.sh --force`; tasks never edit `~/.claude/` directly. Two consequences: (1) `~/.claude/settings.json` is the sole exception — it has no manifest section and is edited in place (Task 2.3); (2) `sync.sh` installs and scans but **never deletes** (verified: no prune path in `sync.sh`), so every DELETE below is two steps — remove the repo file + manifest entry, then `rm` the `~/.claude/` copy explicitly. Task 1.3 itself is the one place the flow runs the other way (`~/.claude/` → repo), and it is a plain copy — see its ACTION.
 
 **NOT Building:**
 - A plugin package (deferred by the user)
 - Any change to `~/.claude/plugins/**` or vendored ECC content beyond deleting rules we own
+- Tracking user-wide artifacts the plan does not change (skills, commands, agents, output styles, the other scripts) — deliberately out of scope; a file enters the repo only when a task is about to change it
 - A compliance *detector* — the EACL finding points at detection, but that is a separate project (audit §8)
 - `promote-artifact` support for the new types — nice-to-have, listed as a Phase 6 stretch
 - Migration of `lazy/agents/**` (out of scope; rules only)
@@ -150,16 +153,18 @@ deny() {
 | `.claude/hooks/lazy-rule-inject.py` | CREATE **second** | The M5 unified `PreToolUse` injector — Task 2.2 (GREEN) |
 | `.claude/lazy/rules/*.md` | CREATE | Promoted lazy bodies |
 | `.claude/rules/*.md` | UPDATE | Promoted user-wide rules, reclassified |
-| `~/.claude/settings.json` | UPDATE | Register the new hook; deregister the two retired injectors; add timeouts |
-| `~/.claude/hooks/ecc-typescript-rule-inject.py` | DELETE | Superseded by M5 |
-| `~/.claude/hooks/confirm-before-test-changes-rule-inject.py` | DELETE | Superseded by M5 |
-| `~/.claude/hooks/plans-index-guard.py` | DELETE | Registered nowhere (audit #11) |
-| `~/.claude/hooks/hooks.json` | DELETE | 37 KB, 21 entries, dead (audit #12) |
-| `~/.claude/hooks/README.md` | DELETE | Documents ~20 hooks that don't run |
-| `~/.claude/rules/{pr-review,context7,knowledge-ops-defaults}.md` | DELETE | Redundant with skills/plugins (audit §3) |
+| `.claude/hooks/*.{py,sh}` | CREATE | The 10 live hooks imported verbatim (Task 1.3) |
+| `.claude/scripts/gh-branch-guard.sh` | CREATE | The one user-wide script the plan changes, imported verbatim (Task 1.3) ahead of its Task 5.1 move |
+| `~/.claude/settings.json` | UPDATE | Register the new hook; deregister the two retired injectors; add timeouts. **Only direct `~/.claude/` write in the plan** — no manifest section covers it |
+| `.claude/hooks/ecc-typescript-rule-inject.py` | DELETE | Superseded by M5 (+ `rm` the `~/.claude/` copy — sync never deletes) |
+| `.claude/hooks/confirm-before-test-changes-rule-inject.py` | DELETE | Superseded by M5 (+ `rm` the `~/.claude/` copy) |
+| `.claude/hooks/plans-index-guard.py` | DELETE | Registered nowhere (audit #11) (+ `rm` the `~/.claude/` copy) |
+| `.claude/hooks/hooks.json` | DELETE | 37 KB, 21 entries, dead (audit #12) (+ `rm` the `~/.claude/` copy) |
+| `.claude/hooks/README.md` | DELETE | Documents ~20 hooks that don't run (+ `rm` the `~/.claude/` copy) |
+| `.claude/rules/{pr-review,context7,knowledge-ops-defaults}.md` | DELETE | Redundant with skills/plugins (audit §3) (+ `rm` the `~/.claude/` copies) |
 | `.claude/rules/web-research-tool-selection.md` | DELETE | Verbatim duplicate of the user-wide copy |
-| `~/.claude/scripts/gh-branch-guard.sh` | MOVE+UPDATE | → `.claude/hooks/`; fix `deny()` |
-| `~/.claude/hooks/check-settings-json-secrets.sh` | UPDATE | Remove `\|\| true`; fail closed on missing `jq` |
+| `.claude/scripts/gh-branch-guard.sh` | MOVE+UPDATE | → `.claude/hooks/`; fix `deny()`; sync installs the new path, then `rm` the old `~/.claude/scripts/` copy |
+| `.claude/hooks/check-settings-json-secrets.sh` | UPDATE | Remove `\|\| true`; fail closed on missing `jq` |
 | `docs/rule-loading-audit.md` | UPDATE | Record outcomes as phases land |
 
 ---
@@ -183,25 +188,26 @@ deny() {
 - **VALIDATE**: `bash sync.sh --dry-run` reports the new sections with `[MISSING]`, exit 0.
 
 **Task 1.3: Import current artifacts into the repo**
-- **ACTION**: Copy the live files from `~/.claude` into `.claude/`, then commit.
-- **IMPLEMENT**: `rules/*.md` (all 24), `lazy/rules/**/*.md` (13), `hooks/*.py` + `*.sh` (the 10 live ones — **not** the 3 marked for deletion).
+- **ACTION**: Bring the user-wide files this plan will change into the repo with a **plain `cp`** — not `sync.sh` (wrong direction and it writes `~/.claude/`), not `/promote-artifact` (validates, syncs and opens git pipelines nobody asked for). Copy, reconcile duplicates, commit. That is the whole task.
+- **IMPLEMENT**: `rules/*.md` (all 24), `lazy/rules/**/*.md` (13), `hooks/*.py` + `*.sh` (the 10 live ones — **not** the 3 marked for deletion), `scripts/gh-branch-guard.sh` (1). 48 files. Nothing else: skills, commands, agents, output styles and the other scripts are untouched by this plan and stay out (drift-check table below records why each category was considered and left).
+- **DUPLICATES**: for every file that already exists on both sides, decide per file — take the user-wide copy, keep the repo copy, or merge — and record the decision in the commit message. Checked 2026-09-09 with a byte-compare across `rules/`, `lazy/rules/`, `hooks/`, `scripts/`: exactly **one** in-scope collision, `rules/web-research-tool-selection.md`, and the two copies are identical → take either; the repo copy is deleted in Phase 3 anyway. (`scripts/open-claude.sh` differs between sides but is out of scope — do not touch it.) If a later task needs a file not in this list, bring it in the same way, at that point, with the same duplicate check.
 - **GOTCHA**: parts of `~/.claude/rules/ecc/**` are **vendored** — an ECC reinstall overwrites them. Run `diff -r` against the ECC source before importing and record ours-vs-vendored per file in `docs/` (audit #K). **Vendored does not mean excluded**: track vendored files too, with a `vendored: ecc@<version>` marker in the manifest entry, so `sync.sh`'s three-way SHA detection reports an ECC overwrite as `[DIVERGED]` with the repo copy as merge base — instead of the overwrite silently reverting any `on:` frontmatter or customization. Same pattern as `tdd-workflow/SKILL.md`'s `customized: true` note, but enforced by sync rather than by prose.
 - **GOTCHA 2 — directory is not origin.** `ecc/common/hooks-todowrite-practices.md` lives in the ECC directory but is absent from every ECC cache version (user-owned, mtime 2026-08-24). Classify every `ecc/**` file by cache match, not path: the 213 skills/commands and 4 scripts below were checked that way; the `rules/ecc/**` and `lazy/rules/ecc/**` files were not until 2026-09-09, when the first one checked turned out to be misclassified. Re-run the check across all of them before importing.
-- **VALIDATE**: `bash sync.sh --dry-run` now reports every entry as in-sync (no `[MISSING]`, no drift).
+- **VALIDATE**: for each of the 48 files, `cmp .claude/<path> ~/.claude/<path>` exits 0 (or, for a merged duplicate, matches the recorded merge). No `sync.sh` run.
 
-**Drift-check finding (2026-09-09), refining the scope of this task:** re-running `sync.sh --dry-run`'s local-only scan found **256 files** running outside this repo's tracking entirely — not the 1 an earlier, narrower grep had suggested. Breakdown by category and confirmed origin:
+**Drift-check finding (2026-09-09), informing what this task leaves out:** re-running `sync.sh --dry-run`'s local-only scan found **256 files** running outside this repo's tracking entirely — not the 1 an earlier, narrower grep had suggested. Breakdown by category and confirmed origin:
 
 | Category | Count | Origin | Action |
 |---|---:|---|---|
-| `skills/` | 100 | **ECC-vendored** — confirmed via plain-file (non-symlink) matches in `~/.claude/plugins/cache/ecc/`, batch-installed 2026-08-21 | Exclude — not this repo's to track |
-| `commands/` | 113 | Same ECC batch, same confirmation method | Exclude |
-| `scripts/` | 20 | **Mixed** — see script-level breakdown below | Split: 4 exclude, 16 import |
-| `rules/` | 23 | **Not ECC** — no cache match, no ECC branding; this project's own custom rules | **In scope for this task** — matches the plan's existing "all 24" figure (23 local-only + `pr-review.md`, itself slated for deletion in Phase 3) |
+| `skills/` | 100 | **ECC-vendored** — confirmed via plain-file (non-symlink) matches in `~/.claude/plugins/cache/ecc/`, batch-installed 2026-08-21 | Leave — the plan changes none of them |
+| `commands/` | 113 | Same ECC batch, same confirmation method | Leave — same reason |
+| `scripts/` | 20 | **Mixed** — see script-level breakdown below | Import 1 (`gh-branch-guard.sh`, changed in Task 5.1); leave 19 |
+| `rules/` | 23 | **Not ECC** — no cache match, no ECC branding; this project's own custom rules | Import — matches the plan's existing "all 24" figure (23 local-only + `pr-review.md`, itself slated for deletion in Phase 3) |
 
 **Script-level breakdown** (20 total, classified by ECC-cache match + mtime clustering):
 
-- **ECC-vendored, exclude (4):** `auto-update.js`, `harness-audit.js`, `setup-package-manager.js`, `skills-health.js` — all four match files in `~/.claude/plugins/cache/ecc/` and share the exact 2026-08-21 batch-install date as the vendored skills/commands above.
-- **User-owned, import in this task (16):** `agent-token-monitor.py`, `default-branch.sh`, `gh-branch-guard.sh`, `github-mcp.sh`, `git-search-content.sh`, `git-worktrees-ahead.sh`, `git-worktrees-dirty.sh`, `git-worktrees.sh`, `lib-resolve-lan-host.sh`, `merge-default.sh`, `open-bash.sh`, `open-code-server.sh`, `open-smb-path.sh`, `restart-code-server.sh`, `tmux-ops-list-windows.sh`, `tmux-ops-move-window.sh` — no ECC-cache match, mtimes spread June–September (no batch clustering), consistent with independent, project-owned scripts. `gh-branch-guard.sh` is already separately in scope for Phase 5 (Task 5.1, its broken `deny()`); this import is a prerequisite for that fix landing under version control at all.
+- **ECC-vendored, leave (4):** `auto-update.js`, `harness-audit.js`, `setup-package-manager.js`, `skills-health.js` — all four match files in `~/.claude/plugins/cache/ecc/` and share the exact 2026-08-21 batch-install date as the vendored skills/commands above.
+- **User-owned (16), of which only `gh-branch-guard.sh` is imported — the plan changes no other:** `agent-token-monitor.py`, `default-branch.sh`, `gh-branch-guard.sh`, `github-mcp.sh`, `git-search-content.sh`, `git-worktrees-ahead.sh`, `git-worktrees-dirty.sh`, `git-worktrees.sh`, `lib-resolve-lan-host.sh`, `merge-default.sh`, `open-bash.sh`, `open-code-server.sh`, `open-smb-path.sh`, `restart-code-server.sh`, `tmux-ops-list-windows.sh`, `tmux-ops-move-window.sh` — no ECC-cache match, mtimes spread June–September (no batch clustering), consistent with independent, project-owned scripts. `gh-branch-guard.sh` is already separately in scope for Phase 5 (Task 5.1, its broken `deny()`); this import is a prerequisite for that fix landing under version control at all.
 
 ### Phase 2 — Retire the expensive injectors
 
@@ -374,7 +380,7 @@ EXPECT: ≤ 14,600 bytes (from 18,759; Cut bucket is 4,180 B after the `ecc/comm
 
 ## Acceptance Criteria
 - [ ] `manifest.yaml` + `sync.sh` manage `hooks` and `lazy`; `--dry-run` clean
-- [ ] Every live rule, lazy body and hook is tracked in this repo
+- [ ] Every user-wide file this plan changes (the 48 of Task 1.3, plus any brought in later the same way) is tracked in this repo before it is changed; nothing outside that set was imported
 - [ ] One `PreToolUse` injector replaces both old ones; both deleted (the four remaining one-off injectors are a separate, deferred decision — Task 6.3)
 - [ ] Injection fires **before** writes and dedupes per `(rule, subject)`
 - [ ] 40-edit trace costs ≈6,450 tok, not ≈86,000
