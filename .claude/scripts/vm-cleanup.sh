@@ -80,6 +80,43 @@ _has_protected() {
   find "$1" \( "${PROTECTED_EXPR[@]}" \) -print -quit 2>/dev/null | grep -q .
 }
 
+# The worktree this script itself is running from -- never touched by ANY
+# section, even if clean, locked, or otherwise eligible. Deleting the caller's
+# own checkout mid-session is never a "SAFE"/"CONFIRM" cleanup, it's active
+# data loss. Resolved once, up here, because sections 9 and 10 both need it.
+SELF_WORKTREE=$(git rev-parse --show-toplevel 2>/dev/null || true)
+
+# _tree_is_active <dir> -- returns 0 when <dir> sits inside a git working tree
+# that someone is plausibly mid-work in: the caller's own checkout, a tree
+# locked via `git worktree lock`, or one with uncommitted changes. Returns 1
+# otherwise, including when <dir> is not inside a git tree at all.
+#
+# Deliberately a SUBSET of section 10's seven guards, and the difference is
+# intentional. Section 10 additionally refuses trees with no upstream or with
+# unpushed commits, because removing a worktree destroys commits that exist
+# nowhere else. node_modules is gitignored and regenerable, so commit
+# reachability says nothing about whether deleting it is safe -- the only
+# question is whether someone is actively working in that tree. Two different
+# consequences, so two different predicates.
+_tree_is_active() {
+  local dir="$1" top gitdir status
+  top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || return 1
+
+  [[ -n "$SELF_WORKTREE" && "$top" == "$SELF_WORKTREE" ]] && return 0
+
+  # `git worktree lock` writes a `locked` file into that worktree's git dir.
+  # Checking the file directly avoids parsing `worktree list --porcelain`,
+  # whose whitespace-split output mangles paths containing spaces.
+  gitdir=$(git -C "$dir" rev-parse --absolute-git-dir 2>/dev/null) || return 1
+  [[ -f "$gitdir/locked" ]] && return 0
+
+  # Unreadable status means we cannot prove the tree is idle -- treat as active.
+  status=$(git -C "$dir" status --porcelain 2>/dev/null) || return 0
+  [[ -n "$status" ]] && return 0
+
+  return 1
+}
+
 # Move every protected file/dir out of the worktree into a timestamped rescue
 # dir (preserving worktree-relative paths), then unregister the worktree.
 # --force is required (rescuing the files makes the tree dirty to git) and
@@ -201,6 +238,13 @@ while IFS= read -r nm; do
     _skip "symlink: ${nm}"
     continue
   fi
+  # Honour the same "someone is working here" signal section 10 respects.
+  # Without this, a dirty or locked worktree -- which section 10 explicitly
+  # refuses to remove -- still had its node_modules deleted out from under it.
+  if _tree_is_active "$(dirname "$nm")"; then
+    _skip "active git tree (current/locked/dirty): ${nm}"
+    continue
+  fi
   SZ=$(_human "$nm")
   echo "  ${nm}: ${SZ}"
   _add "$nm"
@@ -213,10 +257,8 @@ done < <(find "$HOME" \
 # ── 10. git worktrees ─────────────────────────────────────────────────────────
 _section "git worktrees"
 
-# The worktree this script itself is running from -- never touched, even if
-# clean, locked, or otherwise eligible. Deleting the caller's own worktree
-# mid-session is never a "SAFE"/"CONFIRM" cleanup, it's active data loss.
-SELF_WORKTREE=$(git rev-parse --show-toplevel 2>/dev/null || true)
+# SELF_WORKTREE is resolved near the top, alongside _tree_is_active, because
+# section 9 needs it too.
 
 # Find main repos (where .git is a directory, not a file)
 while IFS= read -r git_dir; do
