@@ -1,0 +1,31 @@
+name: tests
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  bash-suite:
+    name: bash test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # sync.sh parses manifest.yaml with python3 + PyYAML.
+      - name: Install PyYAML
+        run: python3 -m pip install --quiet pyyaml
+
+      # Suites build real git repos and worktrees as fixtures, which refuses to
+      # commit without an identity. Each suite also sets this, belt-and-braces.
+      - name: Configure git identity
+        run: |
+          git config --global user.email ci@example.com
+          git config --global user.name "CI"
+          git config --global init.defaultBranch main
+
+      - name: Run bash test suite
+        run: bash .claude/tests/run-all.sh

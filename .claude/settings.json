@@ -5,5 +5,9 @@
     "commit-commands@claude-plugins-official": true,
     "github@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true
+  },
+  "skillOverrides": {
+    "validate-artifact": "name-only",
+    "promote-artifact": "name-only"
   }
 }

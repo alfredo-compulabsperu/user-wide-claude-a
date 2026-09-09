@@ -250,7 +250,7 @@ REC_COUNT=0
 
 if (( DISK_PCT_MAX > 60 )); then
   REC_COUNT=$(( REC_COUNT + 1 ))
-  printf "  %d. ${B}Free disk space:${N} /vm-cleanup --clean --yes\n" "$REC_COUNT"
+  printf "  %d. ${B}Free disk space:${N} /vm-cleanup --clean --risky\n" "$REC_COUNT"
 fi
 
 if command -v npm &>/dev/null; then
