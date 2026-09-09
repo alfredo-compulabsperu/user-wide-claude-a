@@ -96,6 +96,18 @@ When an M2 proxy fires you get a **pointer, not a rule**. That costs:
 | A tool or event (not a path) | Either | **M4** |
 | Nothing matchable (prose/judgment) | Either | **M1** |
 
+### Decision (2026-09-09, plan Task 6.3) — the four surviving one-off injectors stay
+
+M5 (`lazy-rule-inject.py`) is live and measured: it replaced the two per-edit injectors, dedupes per `(rule, subject, session)`, and costs ~29 ms per call. Phase 2 left four hook-injectors untouched: `enterplanmode-rule-inject.py` (`PostToolUse:EnterPlanMode` → `lazy/rules/plan.md`), `research-ops-rule-inject.py` (`PostToolUse:Skill`), `research-ops-promptsubmit.py` (`UserPromptSubmit`) and `research-ops-tooling-gate.py` (`PreToolUse:Skill`, a gate, not a loader).
+
+Chosen: **(c) leave all four as they are.** Reasons:
+
+1. None has a *subject*. M5's dedup key is `(rule, subject, session)`; a tool-only or prompt-level trigger would need a new `on.tools`-only mode with a per-session fallback key — a schema extension with no measured cost problem to justify it. These hooks fire on rare events (`EnterPlanMode`, a specific `Skill`, a prompt match), not on every edit; the unbounded-cost finding (#1) that motivated M5 does not apply to them.
+2. The `research-ops` trio is a coherent subsystem (prompt detection → skill gate → rule injection). Folding one third of it into M5 would split its logic across two mechanisms for no gain.
+3. `enterplanmode-rule-inject.py`'s matcher was only *partially* retested (`EnterPlanMode` is a real tool in this harness); folding it before a clean live retest would be rewriting on assumption.
+
+Revisit when a fifth tool-only rule appears — at that point an `on.tools`-only trigger earns its keep (DRY: abstract at the third instance). The acceptance criterion "one `PreToolUse` injector replaces both old ones" stands as written; "one injector" as a system-wide property is explicitly **not** claimed.
+
 ---
 
 ## 3. Per-rule inventory

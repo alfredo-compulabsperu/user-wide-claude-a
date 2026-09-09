@@ -1,8 +1,8 @@
 # Plans Index
 
-One row per plan/runbook in this directory. Keep in sync — the plans-index-guard
-hook denies creating or editing a plan file not listed here, and blocks any entry
-whose file has been deleted or moved.
+One row per plan/runbook in this directory. Keep in sync by hand — the
+`plans-index-guard` hook that used to enforce this was never registered and was
+deleted 2026-09-09 (lazy-loading plan, Task 6.1).
 
 | Plan | Milestone / Purpose | Status |
 |---|---|---|
