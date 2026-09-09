@@ -199,6 +199,37 @@ exact leak-prone shape that check exists for.
   in the TDD evidence report (Step 8) so it's reusable for the next bash tool here.
 - **Validate**: `kcov` report showing ≥90% line coverage, or an explicit documented gap
   with rationale.
+- **Result — documented gap, not a hard blocker**: `kcov` cannot execute in this
+  session's sandbox at all, for any script (confirmed with a trivial 3-line smoke-test
+  script outside this repo, not just `vm-cleanup.sh`). Root cause verified with
+  `strace -f kcov ... bash <script>`: `ptrace(PTRACE_TRACEME) = -1 EPERM`. `capsh
+  --print` shows `Current: =` (no capabilities held in the current set) despite
+  `cap_sys_ptrace` being present in the *bounding* set — this session's execution
+  sandbox blocks ptrace outright, independent of the standard Linux
+  capability/yama-ptrace-scope model a normal user account would hit. No kcov
+  invocation-flag or include-path fix changes this (three attempts made: relative
+  include-path, absolute include-path, fully-qualified absolute paths throughout —
+  every one reports `"instrumented": 0`).
+  Recommended follow-up (not performed here, out of this task's scope): add a `kcov`
+  step to `.github/workflows/tests.yml` and run it there — GitHub Actions' `ubuntu-latest`
+  runners are unrestricted VMs where kcov's ptrace-based bash instrumentation is known to
+  work, unlike this session's sandbox.
+  Exact invocation to reuse once ptrace is available:
+  `kcov --include-path=<repo>/.claude/scripts/vm-cleanup.sh <repo>/coverage bash <repo>/.claude/tests/scripts/vm-cleanup.test.sh`
+  (paths must be absolute — the script re-resolves its own path to absolute at runtime,
+  so a relative `--include-path` matches zero files).
+  Qualitative coverage in place of a number: the 23 assertions in `vm-cleanup.test.sh`
+  exercise every guard (self, locked, dirty, unreadable status, no-upstream,
+  ahead-of-upstream, protected-files-present), both tiers (SAFE auto-run, RISKY
+  gated), every flag (`--clean`, `--risky`, `--dry-run`, `-h`/`--help`, rejected
+  `--yes`), both exit codes (0 success, 1 on failure with Summary reporting), and
+  idempotency. **Known, acknowledged gap**: the tool-**absent** branches (`apt not
+  found`, `journalctl not found`, `npm not found`, `snap not installed`) are never
+  exercised — every stub in this suite makes those tools present, never absent — so
+  those four `else` branches stay untested regardless of the kcov blocker. This
+  matches the plan's own pre-identified risk ("90% unreachable on tool-absent
+  branches") and is left for the CI follow-up above rather than built here against
+  a metric this session cannot measure.
 
 ## Validation
 
@@ -241,8 +272,12 @@ above: `/validate-artifact .claude/scripts/vm-cleanup.sh` and
 - [x] **AC9** — `--risky` replaces `--yes`; bare `--yes` is rejected.
 
 **Quality**
-- [ ] **AC10** — ≥90% line coverage via `kcov`, or an explicitly documented, justified gap.
-- [ ] **AC11** — `bash .claude/tests/run-all.sh` fully green, including the mandatory
+- [x] **AC10** — ≥90% line coverage via `kcov`, or an explicitly documented, justified gap.
+  (Gap: kcov cannot run in this session's sandbox at all — ptrace blocked, verified via
+  strace/capsh. See Task 7's Result note for root cause, the exact invocation to reuse
+  once ptrace is available, and the one known qualitative gap — apt/journald/npm/snap
+  "not found" branches — left untested regardless.)
+- [x] **AC11** — `bash .claude/tests/run-all.sh` fully green, including the mandatory
   second isolated-environment pass.
 - [x] **AC12** — `shellcheck .claude/scripts/vm-cleanup.sh` clean (baseline today: 8
   low-severity findings — 2× SC2088, 1× SC2012, 5× SC2059 — 0 error-severity; confirm
@@ -264,6 +299,6 @@ above: `/validate-artifact .claude/scripts/vm-cleanup.sh` and
 | Docs location ambiguous (`RUNBOOK.md` extension vs. new file) | Low | Read `RUNBOOK.md`'s actual shape in Task 6 before deciding; state the choice in the PR |
 
 ## Acceptance
-- [ ] All tasks complete
-- [ ] Validation passes
-- [ ] Patterns mirrored, not reinvented
+- [x] All tasks complete
+- [x] Validation passes
+- [x] Patterns mirrored, not reinvented
