@@ -1,3 +1,8 @@
+---
+on:
+  tools: [Edit, Write]
+  paths: ["**/*.py", "**/*.js", "**/*.ts", "**/*.tsx", "**/*.jsx", "**/*.sh", "**/*.go", "**/*.rb", "**/*.rs", "**/*.java"]
+---
 # Ask Before Modifying/Extending Tests
 
 ## Required

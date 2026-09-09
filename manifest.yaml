@@ -68,6 +68,8 @@ hooks:
   - name: context-mode-check.js
   - name: enterplanmode-rule-inject.py
     executable: true
+  - name: lazy-rule-inject.py
+    executable: true
   - name: noop-bash-guard.py
     executable: true
   - name: research-ops-promptsubmit.py
