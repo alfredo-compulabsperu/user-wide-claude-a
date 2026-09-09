@@ -374,7 +374,7 @@ EXPECT: ≤ 15,900 bytes (from 18,759; Cut bucket is 2,872 B after `context7.md`
 - [ ] Fresh session: edit a `.ts` file → rule text appears **before** the write lands
 - [ ] Same session, edit it again → no re-injection
 - [ ] Same session, edit a different `.ts` → injection fires again
-- [ ] Spawn a subagent that edits a `.ts` → rule loads there too
+- [x] Spawn a subagent that edits a `.ts` → rule loads there too — 2026-09-09: general-purpose subagent wrote `probe3.ts`, rewrote it, wrote `probe4.ts`; injected on writes 1 and 3 (7 bodies), silent on 2
 - [ ] `/hooks` lists the new hook and none of the deleted ones
 
 ---
@@ -389,7 +389,7 @@ EXPECT: ≤ 15,900 bytes (from 18,759; Cut bucket is 2,872 B after `context7.md`
 - [x] `gh-branch-guard.sh` can actually deny — 2026-09-09: `deny()` emits `hookSpecificOutput.permissionDecision: deny` via `jq -n`; moved to `.claude/hooks/`; piped `gh pr create --base main` payload → deny JSON, `--base develop` → silent (Task 5.1)
 - [x] Secret scanner fails closed — 2026-09-09: missing/failing `jq` → `exit 2` with a BLOCKED line; shadowed-`jq` run denied a benign `settings.json` write, real `jq` still denies `ghp_…` and allows benign content (Task 5.2)
 - [x] Hook test suite exists and passes, with RED evidence recorded from before the injector existed (Task 2.1) and GREEN evidence from the unmodified same tests after (Task 2.2) — done 2026-09-09: RED `4c9ae02` (12 failed, 0 import errors), GREEN `c4ce66d` (12 passed, test file unchanged); report in `.claude/tdd/lazy-loading-system.tdd.md`
-- [ ] `hook-path-convention` fires, or its failure is documented and reproducible
+- [x] `hook-path-convention` fires, or its failure is documented and reproducible — 2026-09-09: both. Cause found: native `paths:` gating is project-relative, and the governed file is `~/.claude/settings.json` (outside every project); reproduced with an inside/outside Read differential (audit §4-A). It now fires on writes via M5 (merged into `hooks.md`)
 
 ---
 

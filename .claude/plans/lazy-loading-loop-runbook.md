@@ -37,7 +37,7 @@ Human-only. The loop MUST NOT start until every item is `[x]`.
 | 3 | Phase 2 · 2.3 → 2.4 | **HUMAN** (cutover observed in-session instead: write/rewrite/second-file probe) | fresh-session cutover check (plan § Manual Validation, first 3 boxes) | done — fresh-session + subagent repeats left to the user |
 | 4 | Phase 3 · 3.1, 3.2, 3.4 | auto (ran in-session) | `run-all.sh` green; 3.2 read-check deferred to iteration 6's session | done — `10715bb` |
 | 5 | Phase 3 · 3.3 | auto (ran in-session) | eager-load byte script ≥ 2,872 B below 18,759 | done — see commit; `pr-review` split rather than cut, repo `web-research` copy kept (double-load finding in audit §3) |
-| 6 | Phase 4 · 4.1 (+ 3.2 read-check) | **HUMAN** | one fresh session per hypothesis; cause found or documented as reproducible | **open** — write path now fires via M5 (`hooks.md` injected live on a `settings.json` edit); the `paths:` Read-path non-firing is still unexplained and needs your fresh-session bisect |
+| 6 | Phase 4 · 4.1 (+ 3.2 read-check) | **HUMAN** | one fresh session per hypothesis; cause found or documented as reproducible | done (in-session differential, no fresh session needed) — cause: native `paths:` gating is project-relative; `~/.claude/settings.json` is outside every project. Audit §4-A. Subagent propagation confirmed the same day |
 | 7 | Phase 5 · 5.1, 5.2 | auto (ran in-session) | `run-all.sh` green; `gh pr create --base main` denied; shadowed `jq` → deny | done |
 | 8 | Phase 6 · 6.1, 6.2 (stretch), 6.3 (decision) | auto (ran in-session) | no `settings.json` entry references a deleted file | done — 6.1 deleted (`noop-bash-guard.py` kept — user decision 2026-09-09); 6.2 stretch **not done**; 6.3 decision (c) recorded in audit §2 |
 

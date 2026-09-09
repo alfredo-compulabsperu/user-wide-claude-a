@@ -73,6 +73,8 @@ Verified empirically 2026-09-08 (method in Appendix B):
 | **Write** `.py` | inside project | No |
 | **Read** `.py` | inside project | **Yes — all 5, ~10.1 KB at once** |
 
+Second limit, found 2026-09-09 (§4-A): native `paths:` globs are matched **relative to the project root** — a Read of a matching file *outside* the project (e.g. `~/.claude/settings.json`) fires nothing. M5's `on.paths` matches the absolute path and has no such limit.
+
 **Consequence: M2 and M3 structurally cannot govern edits.** Any rule shaped *"when editing X, do Y"* will never load at edit time under `paths:` gating — it loads only if a matching file happens to be Read first, which is incidental, not causal. Under §0 this is a permanent **class-L** failure for the entire edit-triggered rule category: the trigger matches and the rule still does not load.
 
 **Rules of that shape must use M4.** This is not a preference; it is the only mechanism that observes writes.
@@ -226,7 +228,7 @@ Result: zero M2 proxies remain; no file mixes two trigger shapes; `lazy/rules/` 
 
 | # | Class | Issue | Evidence |
 |---|---|---|---|
-| A | **L** | ~~**Glob collision is silent.**~~ **RETRACTED 2026-09-08.** A later test fired **five** rules sharing `**/*.py` *simultaneously* — matching rules plainly do **not** compete, so collision cannot explain anything. **Open question:** why `hook-path-convention.md` never fired on any `settings.json` read remains **unexplained**. Do not act on the collision theory | Refuted empirically, this session |
+| A | **L** | ~~**Glob collision is silent.**~~ **RETRACTED 2026-09-08.** A later test fired **five** rules sharing `**/*.py` *simultaneously* — matching rules do **not** compete. **RESOLVED 2026-09-09 (plan Task 4.1): native `paths:` gating is project-relative.** Differential in one session, `hooks.md` (the merged `hook-path-convention`) and `settings-json-secrets.md` carrying byte-identical `paths: ["**/settings.json", "**/settings.local.json"]`: `Read ~/.claude/settings.json` (outside the project) → **nothing** fired; `Read <worktree>/.claude/settings.json` (inside) → `hooks.md`, `ecc/common/hooks.md` **and** `settings-json-secrets.md` all fired. The file `hook-path-convention` governs is almost always `~/.claude/settings.json`, which lives outside every project — so its trigger could never match. Not a collision, not a content problem. M5 closes the gap: its `fnmatch` on the absolute path injected `hooks.md` on an `Edit` of `~/.claude/settings.json` the same day. Reproduce: any `paths:`-gated rule, one Read inside the project root and one outside | Resolved empirically, 2026-09-09 |
 | A2 | **L** | **`paths:` gating is Read-only** — no `paths:`-gated rule fires on Write/Edit, in-project or out. Every edit-governing gated rule is permanently dark | Empirical, 3-cell test (§2, App. B) |
 | B | **L** | **Forks/subagents don't get `paths:`-gated rules.** A fork triggered 0 injections across 4 matching reads that fired reliably in the main session and a fresh agent | Empirical, this session |
 | C | — | **Hooks *do* reach subagents** — so anything that must hold inside a fork can only use M4 | Official docs + observed hook context in fresh agent |
