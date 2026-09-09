@@ -228,7 +228,7 @@ above: `/validate-artifact .claude/scripts/vm-cleanup.sh` and
   merge, outside Tasks 1–7 — this AC closes at branch level here, and for real on that merge.
 
 **Usability**
-- [ ] **AC8** — `--help` names both tiers (SAFE/RISKY) and at least one example target
+- [x] **AC8** — `--help` names both tiers (SAFE/RISKY) and at least one example target
   from each.
 - [x] **AC9** — `--risky` replaces `--yes`; bare `--yes` is rejected.
 

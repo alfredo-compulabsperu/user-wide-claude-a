@@ -46,7 +46,7 @@ which does not exist until Task 1 completes it.
 |---|---|---|---|
 | 1 | Task 1 | Cherry-pick `18ceb9d` + confirm GREEN baseline (plus ~6 new assertions closing AC1/AC3/AC4 gaps) | done |
 | 2 | Task 2 | Rename `--yes` → `--risky`; add `--dry-run` as explicit alias | done |
-| 3 | Task 3 | Rewrite `--help` to explain both SAFE/RISKY tiers | pending |
+| 3 | Task 3 | Rewrite `--help` to explain both SAFE/RISKY tiers | done |
 | 4 | Task 4 | Harden exit codes (script currently always exits 0) | pending |
 | 5 | Task 5 | Idempotency check (second `--clean --risky` run is a no-op) | pending |
 | 6 | Task 6 | Command file (`.claude/commands/vm-cleanup.md`), manifest registration, docs | pending |

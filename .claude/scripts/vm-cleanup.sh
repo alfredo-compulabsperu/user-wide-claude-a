@@ -2,8 +2,12 @@
 # vm-cleanup.sh -- scan and clean dev VM disk consumers
 #
 # Classification:
-#   SAFE  auto-executes in --clean mode (low risk, recoverable)
-#   RISKY skipped in --clean mode unless --risky is also passed
+#   SAFE  auto-executes in --clean mode (low risk, recoverable): apt cache,
+#         journald logs, npm cache, ~/.cache subdirs (thumbnails/fontconfig/pip)
+#   RISKY skipped in --clean mode unless --risky is also passed (higher risk /
+#         harder to recover): git worktrees, node_modules outside active
+#         worktrees, Trash, old nvm node versions, snap disabled revisions,
+#         firebase emulator cache
 #
 # Protected files (never deleted; at any depth):
 #   .env  .env.*  *.local.json  serviceAccountKey*  *.pem  *.key  *secret*  *credential*
@@ -15,6 +19,7 @@
 #   vm-cleanup.sh --dry-run      same as scan only, explicit alias; overrides --clean/--risky
 #   vm-cleanup.sh --clean        execute SAFE; list RISKY targets (skipped)
 #   vm-cleanup.sh --clean --risky  execute SAFE + RISKY
+#   vm-cleanup.sh -h | --help    show this help
 
 set -euo pipefail
 
@@ -28,7 +33,7 @@ for arg in "$@"; do
     --risky)   RISKY=true ;;
     --dry-run) DRYRUN=true ;;
     -h|--help)
-      sed -n '/^# Usage/,/^[^#]/p' "$0" | grep '^#' | sed 's/^# \?//'
+      sed -n '2,/^[^#]/p' "$0" | grep '^#' | sed 's/^# \?//'
       exit 0 ;;
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
   esac

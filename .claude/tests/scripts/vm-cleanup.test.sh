@@ -254,6 +254,13 @@ WT_LIST_AFTER_DRYRUN=$(git -C "$REPO" worktree list --porcelain)
   && pass "bare invocation and --dry-run behave identically (both mutate nothing)" \
   || fail "bare invocation and --dry-run behave identically (both mutate nothing)"
 
+# ── Run 7: Task 3 — --help names both tiers with an example target each ─────
+OUT_HELP=$(bash "$SCRIPT" --help 2>&1)
+grep -q "SAFE" <<<"$OUT_HELP" && grep -q "RISKY" <<<"$OUT_HELP" \
+  && grep -qi "apt" <<<"$OUT_HELP" && grep -qi "worktree" <<<"$OUT_HELP" \
+  && pass "--help names both tiers (SAFE/RISKY) with an example target each" \
+  || fail "--help names both tiers (SAFE/RISKY) with an example target each"
+
 echo
 if [[ $FAIL -eq 0 ]]; then
   echo "RESULT: GREEN (all assertions passed)"
