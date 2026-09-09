@@ -7,8 +7,9 @@ paths:
   - "**/environment.d/*"
   - "**/.claude.json"
 on:
-  tools: [Edit, Write]
+  tools: [Edit, Write, Bash]
   paths: ["**/.mcp.json", "**/.env", "**/.env.*", "**/.bashrc", "**/environment.d/*", "**/.claude.json"]
+  commands: ["*.mcp.json*", "*.env*", "*.bashrc*", "*environment.d/*", "*.claude.json*"]
 ---
 # Secrets and Environment Variables
 

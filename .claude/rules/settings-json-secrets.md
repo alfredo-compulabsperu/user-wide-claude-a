@@ -3,8 +3,9 @@ paths:
   - "**/settings.json"
   - "**/settings.local.json"
 on:
-  tools: [Edit, Write]
+  tools: [Edit, Write, Bash]
   paths: ["**/settings.json", "**/settings.local.json"]
+  commands: ["*settings.json*", "*settings.local.json*"]
 ---
 # Settings.json Secrets
 
