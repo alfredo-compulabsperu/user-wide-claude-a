@@ -7,6 +7,8 @@
 **Stop condition**: every box in the plan's `## Acceptance Criteria` is `[x]`
 **Write target**: the repo only — `~/.claude/` is updated by `bash sync.sh --force`, never edited directly (plan § Architecture, *Execution principle*). Sole exception: `~/.claude/settings.json` (Task 2.3). Task 1.3 is the one reverse-direction step: a plain `cp` of the 50 files the plan changes, no `sync.sh`, no `/promote-artifact`, duplicates reconciled per file.
 
+**Dev override (added 2026-09-09, after the loop):** the repo's `.claude/settings.json` sets `LAZY_RULE_INJECT_RULE_DIRS` to this repo's `.claude/rules` and `.claude/lazy/rules`, so sessions started *in this repo* are served M5 rules from the repo copies, not `~/.claude`. Rule edits can be tested here before any propagation. Outside this repo the injector uses `~/.claude` as before. Native `paths:` rules are unaffected by the override (still loaded from both copies in this repo).
+
 ## Pre-flight
 
 Human-only. The loop MUST NOT start until every item is `[x]`.

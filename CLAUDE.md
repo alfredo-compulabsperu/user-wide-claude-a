@@ -48,6 +48,9 @@ via `manifest.yaml` like any other.
 - Plugins require `claude` CLI on PATH; install failures retry 3× with backoff
 - `~/.claude/.sync-state.json` tracks the last-synced SHA-256 per artifact (three-way divergence
   detection) — don't hand-edit or delete it; `sync.sh`/`promote-artifact` self-heal it on every run
+- Sessions in this repo get lazy-rule injections from the **repo** copies of `.claude/rules/` and
+  `.claude/lazy/rules/`, not `~/.claude/` — `.claude/settings.json` sets `LAZY_RULE_INJECT_RULE_DIRS`
+  so rule edits are testable before sync. Native `paths:` rules still load from both copies here.
 
 ## GitHub Issue Creation
 

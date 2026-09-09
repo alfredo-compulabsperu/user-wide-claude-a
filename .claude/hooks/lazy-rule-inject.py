@@ -21,7 +21,10 @@ Frontmatter is split by hand, not parsed with PyYAML: this runs on every edit
 and must stay fast, and a hook should not assume the module exists.
 
 Env overrides (tests point both at a tmp dir):
-    LAZY_RULE_INJECT_RULE_DIRS   os.pathsep-separated dirs to scan recursively
+    LAZY_RULE_INJECT_RULE_DIRS   os.pathsep-separated dirs to scan recursively;
+                                 ${VAR} is expanded, so a repo's .claude/settings.json
+                                 can set "${CLAUDE_PROJECT_DIR}/.claude/rules:..." to
+                                 develop rules in-repo without touching ~/.claude
     LAZY_RULE_INJECT_MARKER_DIR  where dedup markers live (default: tempdir)
 
 Always exits 0 — an injector must never block the tool. Every skipped input
@@ -106,7 +109,11 @@ def parse_on_block(lines):
 
 def rule_dirs():
     raw = os.environ.get("LAZY_RULE_INJECT_RULE_DIRS")
-    return [Path(p) for p in raw.split(os.pathsep) if p] if raw else DEFAULT_RULE_DIRS
+    if not raw:
+        return DEFAULT_RULE_DIRS
+    # settings.json `env` values are not expanded by Claude Code, so a repo can
+    # set "${CLAUDE_PROJECT_DIR}/.claude/rules" and we expand it here.
+    return [Path(os.path.expandvars(p)) for p in raw.split(os.pathsep) if p]
 
 
 def load_rules():

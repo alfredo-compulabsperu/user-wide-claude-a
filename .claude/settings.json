@@ -1,4 +1,7 @@
 {
+  "env": {
+    "LAZY_RULE_INJECT_RULE_DIRS": "${CLAUDE_PROJECT_DIR}/.claude/rules:${CLAUDE_PROJECT_DIR}/.claude/lazy/rules"
+  },
   "enabledPlugins": {
     "ecc@ecc": false,
     "claude-md-management@claude-plugins-official": true,
