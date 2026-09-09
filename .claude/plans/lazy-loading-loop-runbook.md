@@ -34,7 +34,7 @@ Human-only. The loop MUST NOT start until every item is `[x]`.
 |---|---|---|---|---|
 | 1 | Phase 1 · 1.1 → 1.3 | auto (ran in-session: worktree guard blocks nested `claude -p`) | `run-all.sh` green; `sync.sh --dry-run` exit 0 (1.1/1.2); all 50 imported files `cmp`-identical to `~/.claude/` (1.3) | done |
 | 2 | Phase 2 · 2.1 (RED) → 2.2 (GREEN) | auto, under `/tdd-workflow` (ran in-session) | RED evidence then GREEN evidence, test file unchanged between | done — `4c9ae02` / `c4ce66d`, `.claude/tdd/lazy-loading-system.tdd.md` |
-| 3 | Phase 2 · 2.3 → 2.4 | **HUMAN** | fresh-session cutover check (plan § Manual Validation, first 3 boxes) | pending |
+| 3 | Phase 2 · 2.3 → 2.4 | **HUMAN** (cutover observed in-session instead: write/rewrite/second-file probe) | fresh-session cutover check (plan § Manual Validation, first 3 boxes) | done — fresh-session + subagent repeats left to the user |
 | 4 | Phase 3 · 3.1, 3.2, 3.4 | auto | `run-all.sh` green; 3.2 read-check deferred to iteration 6's session | pending |
 | 5 | Phase 3 · 3.3 | auto | eager-load byte script ≥ 2,872 B below 18,759 | pending |
 | 6 | Phase 4 · 4.1 (+ 3.2 read-check) | **HUMAN** | one fresh session per hypothesis; cause found or documented as reproducible | pending |

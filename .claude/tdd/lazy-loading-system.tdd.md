@@ -42,8 +42,9 @@ All tests redirect `LAZY_RULE_INJECT_RULE_DIRS` and `LAZY_RULE_INJECT_MARKER_DIR
 - **Not tested — marker dir unwritable → fire anyway + warn.** Implemented (`first_time` catches `OSError`) but a read-only tmpdir fixture was not added this pass.
 - **Not tested — concurrent processes on the same subject → exactly one wins.** Relies on `O_CREAT|O_EXCL`, the same primitive `throttle_demo.py` demonstrates; not exercised with real concurrency.
 - **Not tested — fork propagation (subagent edit).** Requires a live session; deferred to the plan's Manual Validation at iteration 3.
-- **Unverified — the session-id payload key.** No live hook on this machine reads it (grep of `.claude/hooks/` and the context-mode hooks found nothing). The injector reads `session_id`, falls back to the `transcript_path` stem, then to `ppid` with a stderr warning. The real key is confirmed at the iteration-3 cutover (plan GOTCHA 2).
-- **The plan's smoke test as written cannot pass yet.** It expects "JSON containing the TS rule bodies" against the real dirs, but no rule carries an `on:` block until Task 3.1/3.4 adds them. Verified here with a fixture instead; re-run the real-dir smoke after Phase 3.
+- **Session-id payload key — verified live at cutover (Task 2.3).** With the hook registered, three `Write` calls from this session: `probe.ts` → all six bodies injected as `PreToolUse` additionalContext *before* the write; `probe.ts` again → nothing; `probe2.ts` → injected again. No "falling back to ppid" line appeared on stderr, so `session_id` is the real key and dedup is per session as designed.
+- **Fork propagation and the fresh-session repeat** of the above remain on the plan's Manual Validation list for the user; the in-session run satisfies Task 2.3's VALIDATE line.
+- **The plan's real-dir smoke test** became runnable at Task 2.3, when the six lazy bodies gained `on:` blocks; the live run above is that smoke.
 - Latency over the real 51 files: see `## Latency` below.
 
 ## Latency

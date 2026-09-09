@@ -382,8 +382,8 @@ EXPECT: ≤ 15,900 bytes (from 18,759; Cut bucket is 2,872 B after `context7.md`
 ## Acceptance Criteria
 - [x] `manifest.yaml` + `sync.sh` manage `hooks` and `lazy`; `--dry-run` clean — done 2026-09-09 (Tasks 1.1, 1.2)
 - [x] Every user-wide file this plan changes (the 50 of Task 1.3, plus any brought in later the same way) is tracked in this repo before it is changed; nothing outside that set was imported — done 2026-09-09
-- [ ] One `PreToolUse` injector replaces both old ones; both deleted (the four remaining one-off injectors are a separate, deferred decision — Task 6.3)
-- [ ] Injection fires **before** writes and dedupes per `(rule, subject)`
+- [x] One `PreToolUse` injector replaces both old ones; both deleted (the four remaining one-off injectors are a separate, deferred decision — Task 6.3) — done 2026-09-09 (Tasks 2.3, 2.4)
+- [x] Injection fires **before** writes and dedupes per `(rule, subject)` — verified live 2026-09-09: `.claude/tdd/lazy-loading-system.tdd.md` § Coverage
 - [ ] 40-edit trace costs ≈6,450 tok, not ≈86,000
 - [ ] Eager session load reduced by ≥2,872 B from cuts alone, ≥9,200 B once M5 carries the write- and command-triggered rules
 - [ ] `gh-branch-guard.sh` can actually deny
