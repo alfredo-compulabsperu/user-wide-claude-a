@@ -246,13 +246,17 @@ deny() {
 - **ACTION**: For each, decide mechanism per audit §2's selection table.
 - **IMPLEMENT**: Write the decision into a table in `docs/rule-loading-audit.md` §3. Rule of thumb: read-trigger + no fork requirement → keep `paths:`; write/command trigger, or must hold in forks → add `on:`; no matchable trigger → leave eager.
 - **GOTCHA**: **§0 governs — `MUST`/`SHOULD`/`MAY` must not influence this.** Classify on trigger shape only.
-- **VALIDATE**: Every rule lands in exactly one bucket. Zero rules left as an M2 proxy whose body is under ~1 KB.
+- **SPLIT CLAUSE**: a file whose clauses have *different* trigger shapes is split into one file per shape **before** bucketing — the bucket is a property of a trigger, not of a filename, and forcing a mixed file into one bucket either loads untriggerable prose lazily (never seen) or keeps triggerable text eager (the cost this plan exists to remove). Known cases:
+  - `authoring-conventions.md` (1,833 B): the Required heredoc-escaping clause → new file, M5 `on.commands` matching `gh issue|pr` / `git commit` / `<<'` heredocs; the Recommended KISS/YAGNI drafting clause → stays eager (~560 B).
+  - `pr-base-branch.md` (539 B): "PRs MUST target `develop`" + the Advisory override → M5 `on.commands` `gh pr create`; "compare against `develop` first" → session-wide judgment, no trigger, stays eager (~200 B).
+  - Any further mixed file found while classifying gets the same treatment — record the split in the §3 table as two rows.
+- **VALIDATE**: Every rule lands in exactly one bucket, and no single file contains clauses from two buckets. Zero M2 proxies remain (Task 3.2 does the collapsing).
 
 **Task 3.2: Collapse M2 proxies into M3**
-- **ACTION**: Inline the six small lazy bodies back into their gated rule files.
-- **IMPLEMENT**: For `coding-principles`, `command-scripts`, `claude-md-self-reference`, `two-pass-artifacts`, `hook-path-convention`: merge body into the `paths:`-gated file, delete the `lazy/rules/` copy and its manifest entry.
+- **ACTION**: Inline the five M2 proxy bodies back into their gated rule files. (An earlier revision said "six"; the audit's M2 table has exactly five collapse candidates — the other `lazy/rules/` bodies are hook-served, not proxied: `ask-before-test-changes` moves to M5 in Phase 2, `plan` and `research-ops` belong to the injectors deferred in Task 6.3, and `ecc/typescript/*` is handled in Task 3.4.)
+- **IMPLEMENT**: For `coding-principles` (997 B), `command-scripts` (564 B), `claude-md-self-reference` (941 B), `two-pass-artifacts` (1,753 B), `hook-path-convention` (478 B): merge body into the `paths:`-gated file, delete the `lazy/rules/` copy and its manifest entry.
 - **GOTCHA**: `hook-path-convention` *also* needs an `on:` block — it governs *writing* a hook entry, which `paths:` cannot see.
-- **VALIDATE**: Read a matching file; full rule text arrives with no "go read X" indirection.
+- **VALIDATE**: Read a matching file; full rule text arrives with no "go read X" indirection. Afterwards `lazy/rules/` holds only hook-served bodies: `ask-before-test-changes`, `plan`, `research-ops`, `ecc/typescript/*` — no file there is referenced by a `paths:`-gated proxy.
 
 **Task 3.3: Delete redundant eager rules**
 - **ACTION**: Remove `pr-review.md`, `context7.md`, `knowledge-ops-defaults.md` and the duplicate repo `web-research-tool-selection.md`. **Not** the two eager `ecc/common/*` (reclassified 2026-09-09, audit §3 correction): `git-workflow.md` → M5 `on.commands` (`git commit`, `gh pr create`) in Task 3.1; `hooks-todowrite-practices.md` → keep eager, but first check whether `TodoWrite` still exists in the harness — it is absent from the current session's tool list, and if it is gone the rule is dead content and *then* gets deleted.

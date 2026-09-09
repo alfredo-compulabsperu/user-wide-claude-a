@@ -115,7 +115,7 @@ When an M2 proxy fires you get a **pointer, not a rule**. That costs:
 | `ecc/common/git-workflow.md` | 755 | Vendored ECC (byte-identical to cache 2.2.0; already stale vs 2.2.1, which rewrote line 12). Both sections are command-triggerable: commit format on `git commit`, PR workflow on `gh pr create` | → **M5** `on.commands`; track in the repo with a `vendored: ecc@2.2.0` marker so an ECC overwrite shows as `[DIVERGED]` instead of silently reverting | M5 |
 | `plan-approval-trust.md` | 651 | No matchable trigger (judgment/behavioral) | Keep eager | Keep |
 | `worktree-isolation.md` | 558 | Session-wide, no matchable trigger | Keep eager | Keep |
-| `pr-base-branch.md` | 539 | No file glob, but Bash-hookable on `gh pr create` | Keep eager, or **M4** on Bash | Keep |
+| `pr-base-branch.md` | 539 | Mixed trigger shapes: the PR-target MUST is hookable on `gh pr create`; the "compare against `develop` first" clause is session-wide judgment | Split (plan Task 3.1): PR-target + Advisory → **M5** on `gh pr create`; comparison clause stays eager (~200 B) | Split |
 | `active-session-hooks.md` | 409 | **Documents a gate that's already off** (`GATEGUARD_BASH_ROUTINE_DISABLED=1`) | Fix claim or delete | Fix |
 | `ecc/common/hooks-todowrite-practices.md` | 325 | **Not vendored** — absent from every ECC cache version (2.2.0, 2.2.1, all locale copies); mtime 2026-08-24, three days after the ECC batch. Misclassified by directory. Only trigger is the `TodoWrite` tool itself (no subject), and that tool is absent from the current harness tool list | Keep eager pending a `TodoWrite`-exists check; if it exists, tools-only trigger via plan Task 6.3; if not, delete as dead content | Keep |
 | `archiving.md` | 324 | No matchable trigger (prose) | Keep eager | Keep |
