@@ -1,10 +1,11 @@
 version: 1
-generated: "2026-07-08"  # Update manually or via generation tool
+generated: "2026-09-09"  # Update manually or via generation tool
 idempotency: prompt  # skip | overwrite | prompt — sync script default
 
 skills:
   - name: catalog
   - name: knowledge-ops
+  - name: pr-review
   - name: research-ops
   - name: run-prd
   - name: execute-plan
@@ -25,6 +26,78 @@ agents: []
 rules:
   - name: gh-issue-rules.md
   - name: web-research-tool-selection.md
+  - name: active-session-hooks.md
+  - name: archiving.md
+  - name: ask-before-test-changes.md
+  - name: authoring-conventions.md
+  - name: claude-md-self-reference.md
+  - name: coding-principles.md
+  - name: command-scripts.md
+  - name: context7.md
+  - name: goal-focus-chore-deferral.md
+  - name: hook-path-convention.md
+  - name: hooks.md
+  - name: knowledge-ops-defaults.md
+  - name: plan-approval-trust.md
+  - name: plan-cross-reference-integrity.md
+  - name: plan-preflight.md
+  - name: pr-base-branch.md
+  - name: pr-review.md
+  - name: rule-authoring-format.md
+  - name: secrets-and-env.md
+  - name: settings-json-secrets.md
+  - name: terse-artifact-content.md
+  - name: two-pass-artifacts.md
+  - name: worktree-isolation.md
+  # ECC-shipped, tracked so an ECC reinstall shows as [DIVERGED] rather than a silent revert.
+  # `vendored` is inert to sync (it reads only `name`) — documentation for drift recovery.
+  - name: ecc/common/git-workflow.md
+    vendored: ecc
+  - name: ecc/common/hooks-todowrite-practices.md
+    vendored: ecc
+
+# Hook scripts registered under `hooks.<Event>` in ~/.claude/settings.json.
+# Only the live, registered ones; the two per-edit injectors are retired in Phase 2.
+hooks:
+  - name: check-mcp-gitignore.py
+    executable: true
+  - name: check-settings-json-secrets.sh
+    executable: true
+  - name: context-mode-cache-heal.mjs
+    executable: true
+  - name: context-mode-check.js
+  - name: enterplanmode-rule-inject.py
+    executable: true
+  - name: noop-bash-guard.py
+    executable: true
+  - name: research-ops-promptsubmit.py
+    executable: true
+  - name: research-ops-rule-inject.py
+    executable: true
+  - name: research-ops-tooling-gate.py
+    executable: true
+
+# Lazy-loaded rule bodies (~/.claude/lazy/). Names carry the nested path; sync's
+# install_file mkdir -p's the parent, so depth is fine.
+lazy:
+  - name: rules/ask-before-test-changes.md
+  - name: rules/claude-md-self-reference.md
+  - name: rules/coding-principles.md
+  - name: rules/command-scripts.md
+  - name: rules/hook-path-convention.md
+  - name: rules/plan.md
+  - name: rules/research-ops.md
+  - name: rules/two-pass-artifacts.md
+  - name: rules/ecc/typescript/coding-style.md
+    vendored: ecc
+  - name: rules/ecc/typescript/hooks.md
+    vendored: ecc
+  - name: rules/ecc/typescript/patterns.md
+    vendored: ecc
+  - name: rules/ecc/typescript/security.md
+    vendored: ecc
+  - name: rules/ecc/typescript/testing.md
+    vendored: ecc
 
 output_styles:
   - name: plain-terse-glossed.md
@@ -41,6 +114,8 @@ scripts:
   - name: rename-tmux-window.sh
     executable: true
   - name: vm-cleanup.sh
+    executable: true
+  - name: gh-branch-guard.sh
     executable: true
 
 claude_md:
