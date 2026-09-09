@@ -20,6 +20,7 @@ commands:
   - name: open-gh-pr.md
   - name: rename-tmux-window.md
   - name: session-summary.md
+  - name: vm-cleanup.md
 
 agents: []
 

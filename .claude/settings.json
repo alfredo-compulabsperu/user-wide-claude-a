@@ -11,5 +11,9 @@
     "exa@claude-plugins-official": true,
     "context7@claude-plugins-official": true,
     "firecrawl@claude-plugins-official": true
+  },
+  "skillOverrides": {
+    "validate-artifact": "name-only",
+    "promote-artifact": "name-only"
   }
 }

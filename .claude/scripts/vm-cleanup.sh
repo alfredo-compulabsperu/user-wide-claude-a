@@ -2,8 +2,12 @@
 # vm-cleanup.sh -- scan and clean dev VM disk consumers
 #
 # Classification:
-#   SAFE    auto-executes in --clean mode (low risk, recoverable)
-#   CONFIRM skipped in --clean mode unless --yes is also passed
+#   SAFE  auto-executes in --clean mode (low risk, recoverable): apt cache,
+#         journald logs, npm cache, ~/.cache subdirs (thumbnails/fontconfig/pip)
+#   RISKY skipped in --clean mode unless --risky is also passed (higher risk /
+#         harder to recover): git worktrees, node_modules outside active
+#         worktrees, Trash, old nvm node versions, snap disabled revisions,
+#         firebase emulator cache
 #
 # Protected files (never deleted; at any depth):
 #   .env  .env.*  *.local.json  serviceAccountKey*  *.pem  *.key  *secret*  *credential*
@@ -11,25 +15,31 @@
 # ~/.claude/cleanup-rescue/<worktree>-<timestamp>/ before the worktree is removed.
 #
 # Usage:
-#   vm-cleanup.sh              scan only; print targets with sizes
-#   vm-cleanup.sh --clean      execute SAFE; list CONFIRM targets (skipped)
-#   vm-cleanup.sh --clean --yes  execute SAFE + CONFIRM
+#   vm-cleanup.sh                scan only; print targets with sizes
+#   vm-cleanup.sh --dry-run      same as scan only, explicit alias; overrides --clean/--risky
+#   vm-cleanup.sh --clean        execute SAFE; list RISKY targets (skipped)
+#   vm-cleanup.sh --clean --risky  execute SAFE + RISKY
+#   vm-cleanup.sh -h | --help    show this help
 
 set -euo pipefail
 
 CLEAN=false
-YES=false
+RISKY=false
+DRYRUN=false
 
 for arg in "$@"; do
   case "$arg" in
-    --clean) CLEAN=true ;;
-    --yes)   YES=true ;;
+    --clean)   CLEAN=true ;;
+    --risky)   RISKY=true ;;
+    --dry-run) DRYRUN=true ;;
     -h|--help)
-      sed -n '/^# Usage/,/^[^#]/p' "$0" | grep '^#' | sed 's/^# \?//'
+      sed -n '2,/^[^#]/p' "$0" | grep '^#' | sed 's/^# \?//'
       exit 0 ;;
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
   esac
 done
+
+$DRYRUN && CLEAN=false
 
 # ── terminal colors (disabled when not a tty) ─────────────────────────────────
 if [[ -t 1 ]]; then
@@ -39,6 +49,8 @@ else
 fi
 
 TOTAL_BYTES=0
+FAILURES=0
+FAILED_ACTIONS=()
 
 _section() { printf "\n${B}=== %s ===${N}\n" "$1"; }
 _bytes()   { du -sb "$1" 2>/dev/null | cut -f1 || echo 0; }
@@ -48,19 +60,25 @@ _add()     { TOTAL_BYTES=$(( TOTAL_BYTES + $(_bytes "$1") )); }
 _safe() {
   local desc="$1"; shift
   printf "  ${G}[SAFE]${N}    %s\n" "$desc"
-  $CLEAN && { "$@" 2>&1 | sed 's/^/    /' || true; }
+  if $CLEAN && ! "$@" 2>&1 | sed 's/^/    /'; then
+    FAILURES=$(( FAILURES + 1 ))
+    FAILED_ACTIONS+=("$desc")
+  fi
   return 0
 }
 
 _confirm() {
   local desc="$1"; shift
-  if $CLEAN && $YES; then
-    printf "  ${Y}[CONFIRM]${N} %s\n" "$desc"
-    "$@" 2>&1 | sed 's/^/    /' || true
+  if $CLEAN && $RISKY; then
+    printf "  ${Y}[RISKY]${N} %s\n" "$desc"
+    if ! "$@" 2>&1 | sed 's/^/    /'; then
+      FAILURES=$(( FAILURES + 1 ))
+      FAILED_ACTIONS+=("$desc")
+    fi
   elif $CLEAN; then
-    printf "  ${Y}[CONFIRM]${N} ${R}(skipped -- rerun with --yes)${N} %s\n" "$desc"
+    printf "  ${Y}[RISKY]${N} ${R}(skipped -- rerun with --risky)${N} %s\n" "$desc"
   else
-    printf "  ${Y}[CONFIRM]${N} %s\n" "$desc"
+    printf "  ${Y}[RISKY]${N} %s\n" "$desc"
   fi
   return 0
 }
@@ -121,6 +139,7 @@ _tree_is_active() {
 # dir (preserving worktree-relative paths), then unregister the worktree.
 # --force is required (rescuing the files makes the tree dirty to git) and
 # safe: eligibility gates — unlocked, clean, pushed, not self — already passed.
+# shellcheck disable=SC2329 # invoked indirectly: passed as "$@" to _confirm below
 _rescue_and_remove_worktree() {
   local wt="$1" repo="$2"
   local rescue f rel
@@ -353,8 +372,18 @@ printf "  Estimated reclaimable (enumerated targets): %s\n" "$RECLAIMABLE"
 if ! $CLEAN; then
   printf "\n  ${Y}Scan complete.${N}\n"
   printf "  Run with ${B}--clean${N} to execute SAFE actions (apt, journald, npm cache, ~/.cache subdirs).\n"
-  printf "  Run with ${B}--clean --yes${N} to also execute CONFIRM actions (node_modules, worktrees, Trash, etc).\n"
-elif ! $YES; then
-  printf "\n  ${Y}SAFE actions executed. CONFIRM targets were listed but skipped.${N}\n"
-  printf "  Rerun with ${B}--clean --yes${N} to execute CONFIRM targets.\n"
+  printf "  Run with ${B}--clean --risky${N} to also execute RISKY actions (node_modules, worktrees, Trash, etc).\n"
+elif ! $RISKY; then
+  printf "\n  ${Y}SAFE actions executed. RISKY targets were listed but skipped.${N}\n"
+  printf "  Rerun with ${B}--clean --risky${N} to execute RISKY targets.\n"
 fi
+
+if (( FAILURES > 0 )); then
+  printf "\n  ${R}Failed actions (%d):${N}\n" "$FAILURES"
+  for action in "${FAILED_ACTIONS[@]}"; do
+    printf "    - %s\n" "$action"
+  done
+  exit 1
+fi
+
+exit 0

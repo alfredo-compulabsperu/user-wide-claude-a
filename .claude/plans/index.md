@@ -16,4 +16,6 @@ deleted 2026-09-09 (lazy-loading plan, Task 6.1).
 | [portability-loop-runbook.md](portability-loop-runbook.md) | Loop runbook (sequential, safe mode) for the same portability PRD | complete |
 | [sync-state-divergence-detection.plan.md](sync-state-divergence-detection.plan.md) | Three-way divergence detection (`sync-state.sh`) for `sync.sh` and `promote-artifact` | complete |
 | [vm-cleanup-issue-36.plan.md](vm-cleanup-issue-36.plan.md) | Issue #36 — vm-cleanup.sh husk fix, depth-mismatch fix, track script in repo | complete |
-| [lazy-loading-loop-runbook.md](lazy-loading-loop-runbook.md) | Loop runbook (sequential, fast mode, hybrid human gates) driving `.claude/PRPs/plans/lazy-loading-system.plan.md` | pending |
+| [vm-cleanup-hardening.plan.md](vm-cleanup-hardening.plan.md) | vm-cleanup.sh hardening — land stranded `18ceb9d`, rename `--yes`→`--risky`, exit-code + idempotency + coverage gates | complete |
+| [vm-cleanup-hardening-loop-runbook.md](vm-cleanup-hardening-loop-runbook.md) | Loop runbook (sequential, fast mode) driving the vm-cleanup-hardening plan's 7 tasks | complete |
+| [lazy-loading-loop-runbook.md](lazy-loading-loop-runbook.md) | Loop runbook (sequential, fast mode, hybrid human gates) driving `.claude/PRPs/plans/lazy-loading-system.plan.md` | in-progress — fresh-session validations pending |
