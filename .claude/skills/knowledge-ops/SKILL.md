@@ -44,6 +44,7 @@ Prefer the live workspace model:
 - **Cross-session persistence with queryable graph structure**
 
 ### Layer 4: Knowledge base repo / durable document store
+- **Path:** defaults to `/home/alfredo/knowledge-base/` — `projects/` for durable technical notes and runbooks, `sessions/` for session exports
 - **Use for:** curated durable notes, session exports, synthesized research, operator memory, long-form docs
 - **Rule:** this is the preferred durable store for cross-machine context when the content is not repo-owned code
 

@@ -139,6 +139,14 @@ host's CLI or API here, since this skill is repo- and host-agnostic.
 
 ## Scope and boundaries
 
+- **Tool selection (MUST).** If the repo has its own explicit PR-review tool — a
+  repo-local command, skill, or agent whose stated purpose is reviewing a PR/diff as a
+  whole, not a generic linter or single-dimension quality tool — do not silently pick
+  one. Compare what each covers and which fits the diff at hand, then prompt the user to
+  choose between the repo-local tool and this skill, stating a recommendation. If the repo
+  has no such tool, use this skill directly and do not ask. A plan step that names this
+  choice must not lock it in at authoring time — name no tool, or state the choice is
+  deferred to execution, since repo tooling can change before the step runs.
 - Review only — not merge/fix/close.
 - Repo-agnostic — no hardcoded paths; identify the repo's own canonical/high-stakes files
   and domain-owner skills fresh each time.
