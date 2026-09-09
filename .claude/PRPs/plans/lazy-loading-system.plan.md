@@ -146,8 +146,8 @@ deny() {
 |---|---|---|
 | `manifest.yaml` | UPDATE | Add `hooks:` and `lazy:` sections; extend `rules:` to the full promoted set |
 | `sync.sh` | UPDATE | Install loops + drift scan for two new types; `hooks` needs `chmod +x` |
-| `.claude/hooks/lazy-rule-inject.py` | CREATE | The M5 unified `PreToolUse` injector |
-| `.claude/hooks/tests/test_lazy_rule_inject.py` | CREATE | First real test of a live hook (audit #11: only dead code is tested) |
+| `.claude/hooks/tests/test_lazy_rule_inject.py` | CREATE **first** | First real test of a live hook (audit #11: only dead code is tested). Written and failing before the injector — Task 2.1 (RED) |
+| `.claude/hooks/lazy-rule-inject.py` | CREATE **second** | The M5 unified `PreToolUse` injector — Task 2.2 (GREEN) |
 | `.claude/lazy/rules/*.md` | CREATE | Promoted lazy bodies |
 | `.claude/rules/*.md` | UPDATE | Promoted user-wide rules, reclassified |
 | `~/.claude/settings.json` | UPDATE | Register the new hook; deregister the two retired injectors; add timeouts |
@@ -204,8 +204,17 @@ deny() {
 
 ### Phase 2 — Retire the expensive injectors
 
-**Task 2.1: Build `lazy-rule-inject.py`**
-- **ACTION**: Create the unified `PreToolUse` injector.
+> **Run this phase under `/tdd-workflow .claude/PRPs/plans/lazy-loading-system.plan.md`.** Tasks 2.1 and 2.2 are the RED and GREEN halves of one cycle and MUST NOT be reordered: the test is written and observed failing *before* the injector exists. Capture RED evidence (the failing run's output) and GREEN evidence (the same command passing) — the skill's Step 8 evidence report maps plan task → test target → RED → GREEN. Checkpoint-commit after each half; do not squash until the phase completes.
+
+**Task 2.1 (RED): Write the failing hook test first**
+- **ACTION**: Create `.claude/hooks/tests/test_lazy_rule_inject.py` **before** any injector code exists. This is the first real test of a live hook (audit #11: only dead code is tested today).
+- **IMPLEMENT**: Cases — matching path fires; non-matching path silent; second call same subject silent; different subject fires; malformed payload exits 0 *and* writes stderr; missing rule dir exits 0.
+- **GOTCHA 1**: Tests must point the marker dir at a temp path, or they pollute the real session throttle and pass spuriously on re-run.
+- **GOTCHA 2**: RED must fail for the *right* reason. A bare `ModuleNotFoundError`/missing-file error proves only that the file is absent, not that the assertions are meaningful — exactly the vacuous-pass trap hit last session with the relative-path `vm-cleanup` test. Create a stub `lazy-rule-inject.py` that exits 0 emitting nothing, so every case fails on its own assertion.
+- **VALIDATE (RED)**: `python3 -m pytest .claude/hooks/tests/ -q` — every case **fails**, each on its own assertion, none on an import or file-not-found error. Record this output as RED evidence.
+
+**Task 2.2 (GREEN): Build `lazy-rule-inject.py`**
+- **ACTION**: Replace the stub with the unified `PreToolUse` injector, changing nothing in the Task 2.1 tests.
 - **IMPLEMENT**:
   1. Parse stdin payload; extract `tool_name`, `tool_input`, `session_id`.
   2. Derive the *subject*: `tool_input.file_path` for `Edit|Write|NotebookEdit|Read`, `tool_input.command` for `Bash`.
@@ -218,13 +227,7 @@ deny() {
 - **GOTCHA 1**: **`PreToolUse` supports `additionalContext` — confirmed empirically this session** (context-mode's `PreToolUse:Bash` guidance arrived that way). Do not assume it's PostToolUse-only.
 - **GOTCHA 2**: The exact payload key for the session id is **unverified**. Log the raw payload once from a live invocation and confirm before relying on `session_id`; falling back to `os.getppid()` is unreliable (context-mode issue #298).
 - **GOTCHA 3**: Never `except: sys.exit(0)` silently — write a one-line reason to stderr first (audit #6). Still exit 0: an injector must never block the tool.
-- **VALIDATE**: `echo '{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.ts"},"session_id":"t1"}' | python3 .claude/hooks/lazy-rule-inject.py` emits JSON containing the TS rule bodies; a second identical run emits nothing.
-
-**Task 2.2: Write the first real hook test**
-- **ACTION**: Create `.claude/hooks/tests/test_lazy_rule_inject.py`.
-- **IMPLEMENT**: Cases — matching path fires; non-matching path silent; second call same subject silent; different subject fires; malformed payload exits 0 *and* writes stderr; missing rule dir exits 0.
-- **GOTCHA**: Tests must point the marker dir at a temp path, or they pollute the real session throttle and pass spuriously on re-run.
-- **VALIDATE**: `python3 -m pytest .claude/hooks/tests/ -q` — all pass.
+- **VALIDATE (GREEN)**: `python3 -m pytest .claude/hooks/tests/ -q` — all Task 2.1 cases now pass, with no edits to the test file. Record as GREEN evidence. Then the smoke check: `echo '{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.ts"},"session_id":"t1"}' | python3 .claude/hooks/lazy-rule-inject.py` emits JSON containing the TS rule bodies; a second identical run emits nothing.
 
 **Task 2.3: Cut over**
 - **ACTION**: Register the new hook, deregister the two old ones.
@@ -287,6 +290,13 @@ deny() {
 **Task 6.1**: Delete `plans-index-guard.py`, `hooks/hooks.json`, `hooks/README.md`, `hooks/tests/` (the old suite testing only dead code), `noop-bash-guard.py` if still unwanted. **VALIDATE**: no `settings.json` entry references a deleted file.
 
 **Task 6.2 (stretch)**: Extend `promote-artifact` to accept `rule | hook | lazy` so future promotion is repeatable rather than manual.
+
+**Task 6.3 (decision, deferred)**: Decide whether the four surviving one-off injectors fold into M5.
+- **CONTEXT**: Phase 2 retires only 2 of the 6 injectors in `~/.claude/hooks/`. `enterplanmode-rule-inject.py`, `research-ops-rule-inject.py`, `research-ops-promptsubmit.py` and `research-ops-tooling-gate.py` are the same class of thing — a hook that loads rule text on a trigger — and survive as one-offs. The acceptance criterion "one injector replaces both old ones" is met while "one injector" as a system property is not.
+- **WHY DEFERRED**: M5 as specced matches on `tool_name` + path/command. `enterplanmode-rule-inject.py` triggers on a *tool* with no subject, and the `research-ops` trio spans `UserPromptSubmit` plus a tooling gate — neither fits the `(rule, subject)` dedup key without extending the `on:` schema. Deciding before M5 is live and measured would be designing on assumption.
+- **ALSO OPEN**: the `EnterPlanMode` matcher was only *partially* refuted last session (`EnterPlanMode` is a real tool in the current harness) — needs a live retest before anything is rewritten or folded.
+- **DECIDE**: after Phase 2's manual validation passes, pick one: (a) extend `on:` with a `tools`-only trigger and a per-session dedup fallback, fold all four; (b) fold only `enterplanmode-rule-inject.py`, leave `research-ops` as a coherent subsystem; (c) leave all four and record why in audit §2.
+- **VALIDATE**: the decision and its reasoning are written into `docs/rule-loading-audit.md` §2 and the acceptance criterion below is reworded to match.
 
 ---
 
@@ -359,13 +369,13 @@ EXPECT: ≤ 13,500 bytes (from 18,759)
 ## Acceptance Criteria
 - [ ] `manifest.yaml` + `sync.sh` manage `hooks` and `lazy`; `--dry-run` clean
 - [ ] Every live rule, lazy body and hook is tracked in this repo
-- [ ] One `PreToolUse` injector replaces both old ones; both deleted
+- [ ] One `PreToolUse` injector replaces both old ones; both deleted (the four remaining one-off injectors are a separate, deferred decision — Task 6.3)
 - [ ] Injection fires **before** writes and dedupes per `(rule, subject)`
 - [ ] 40-edit trace costs ≈6,450 tok, not ≈86,000
 - [ ] Eager session load reduced by ≥5,260 B
 - [ ] `gh-branch-guard.sh` can actually deny
 - [ ] Secret scanner fails closed
-- [ ] Hook test suite exists and passes
+- [ ] Hook test suite exists and passes, with RED evidence recorded from before the injector existed (Task 2.1) and GREEN evidence from the unmodified same tests after (Task 2.2)
 - [ ] `hook-path-convention` fires, or its failure is documented and reproducible
 
 ---
@@ -375,7 +385,7 @@ EXPECT: ≤ 13,500 bytes (from 18,759)
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
 | ECC reinstall reverts vendored `rules/ecc/**` | **High** | Medium | Record ours-vs-vendored in `docs/` (Task 1.3); prefer editing only files we own |
-| Session-id payload key differs from assumption | Medium | High — dedup silently degrades to per-process | Log one live payload before coding (Task 2.1 Gotcha 2) |
+| Session-id payload key differs from assumption | Medium | High — dedup silently degrades to per-process | Log one live payload before coding (Task 2.2 Gotcha 2) |
 | `PreToolUse` injector adds latency to every edit | Medium | Medium | Frontmatter split, not a YAML parse; no network/subprocess; measure before/after |
 | Deleting `context7.md` while the plugin is broken | Medium | Low | Plugin currently fails `AUTH_HEADER_REJECTED` — verify before deleting (Task 3.3) |
 | Cutover leaves a window with no test-change guard | Low | Medium | Register M5 **before** deleting the old injectors; both merge safely |
