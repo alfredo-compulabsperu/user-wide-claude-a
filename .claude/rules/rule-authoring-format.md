@@ -2,6 +2,9 @@
 paths:
   - ".claude/rules/**/*.md"
   - ".claude/lazy/rules/**/*.md"
+on:
+  tools: [Edit, Write]
+  paths: [".claude/rules/**/*.md", ".claude/lazy/rules/**/*.md"]
 ---
 
 # Rule Authoring Format

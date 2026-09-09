@@ -28,14 +28,12 @@ rules:
   - name: web-research-tool-selection.md
   - name: active-session-hooks.md
   - name: archiving.md
-  - name: ask-before-test-changes.md
   - name: authoring-conventions.md
   - name: claude-md-self-reference.md
   - name: coding-principles.md
   - name: command-scripts.md
   - name: context7.md
   - name: goal-focus-chore-deferral.md
-  - name: hook-path-convention.md
   - name: hooks.md
   - name: knowledge-ops-defaults.md
   - name: plan-approval-trust.md
@@ -51,8 +49,6 @@ rules:
   - name: worktree-isolation.md
   # ECC-shipped, tracked so an ECC reinstall shows as [DIVERGED] rather than a silent revert.
   # `vendored` is inert to sync (it reads only `name`) — documentation for drift recovery.
-  - name: ecc/common/git-workflow.md
-    vendored: ecc
   - name: ecc/common/hooks-todowrite-practices.md
     vendored: ecc
 
@@ -83,13 +79,12 @@ hooks:
 # install_file mkdir -p's the parent, so depth is fine.
 lazy:
   - name: rules/ask-before-test-changes.md
-  - name: rules/claude-md-self-reference.md
-  - name: rules/coding-principles.md
-  - name: rules/command-scripts.md
-  - name: rules/hook-path-convention.md
+  - name: rules/heredoc-quoting.md
   - name: rules/plan.md
+  - name: rules/pr-base-branch.md
   - name: rules/research-ops.md
-  - name: rules/two-pass-artifacts.md
+  - name: rules/ecc/common/git-workflow.md
+    vendored: ecc
   - name: rules/ecc/typescript/coding-style.md
     vendored: ecc
   - name: rules/ecc/typescript/hooks.md

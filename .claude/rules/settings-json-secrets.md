@@ -1,3 +1,11 @@
+---
+paths:
+  - "**/settings.json"
+  - "**/settings.local.json"
+on:
+  tools: [Edit, Write]
+  paths: ["**/settings.json", "**/settings.local.json"]
+---
 # Settings.json Secrets
 
 | Rule | Requirement |

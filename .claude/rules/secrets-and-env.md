@@ -1,3 +1,15 @@
+---
+paths:
+  - "**/.mcp.json"
+  - "**/.env"
+  - "**/.env.*"
+  - "**/.bashrc"
+  - "**/environment.d/*"
+  - "**/.claude.json"
+on:
+  tools: [Edit, Write]
+  paths: ["**/.mcp.json", "**/.env", "**/.env.*", "**/.bashrc", "**/environment.d/*", "**/.claude.json"]
+---
 # Secrets and Environment Variables
 
 ## Required

@@ -1,3 +1,8 @@
+---
+on:
+  tools: [Bash]
+  commands: ["git commit*", "gh pr create*"]
+---
 # Git Workflow
 
 ## Commit Message Format

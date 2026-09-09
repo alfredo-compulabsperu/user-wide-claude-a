@@ -5,6 +5,9 @@ paths:
   - ".claude/skills/**/*.md"
   - ".claude/agents/*.md"
   - ".claude/commands/*.md"
+on:
+  tools: [Edit, Write]
+  paths: ["CLAUDE.md", "**/CLAUDE.md", ".claude/skills/**/*.md", ".claude/agents/*.md", ".claude/commands/*.md"]
 ---
 
 ## Required

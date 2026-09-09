@@ -179,6 +179,30 @@ Separately, deleting the duplicated repo copy of `web-research-tool-selection.md
 
 **Not orphans:** `lazy/rules/plan.md` and `lazy/rules/research-ops.md` have no proxy stub **by design** — hook-only splits, explicitly legal per `rule-authoring-format.md`. The only cost is human discoverability.
 
+### Classification applied 2026-09-09 (plan Tasks 3.1, 3.2, 3.4)
+
+Every user-owned rule classified on **trigger shape only** (§0 — strength ignored), per the selection rule above. M5 = the `lazy-rule-inject.py` `PreToolUse` injector, live since 2026-09-09. "Dual" = keeps `paths:` for native Read-gating and adds `on:` for the injector; such files stay under `rules/` and are not eager. `on:`-only files live under `lazy/rules/` (hook-served, no proxy).
+
+| Rule | Trigger shape | Bucket | Change made |
+|---|---|---|---|
+| `settings-json-secrets` | writes to `settings*.json` | Dual | added `paths:` + `on: [Edit, Write]` — left the eager path (3,071 B) |
+| `secrets-and-env` | writes to `.mcp.json`, `.env*`, `.bashrc`, `environment.d/*`, `.claude.json` | Dual | same (2,502 B) |
+| `plan-preflight`, `plan-cross-reference-integrity`, `two-pass-artifacts` | read **and write** of `.claude/plans/**` (+ `docs/**` for two-pass) | Dual | `on:` mirroring existing `paths:` |
+| `rule-authoring-format` | read/write of `rules/**`, `lazy/rules/**` | Dual | same |
+| `terse-artifact-content` | read/write of `CLAUDE.md`, skills, agents, commands | Dual | same |
+| `coding-principles`, `command-scripts`, `claude-md-self-reference` | read/write of their globs | Dual | **M2 proxy collapsed into the rule file** (Task 3.2); lazy body deleted |
+| `hooks` ← `hook-path-convention` | writes to `settings*.json` | Dual | audit "Merge": `hook-path-convention` proxy + body folded into `hooks.md` under the proxy's exact `paths:` (so the Phase 4 bisect still targets the same globs); both `hook-path-convention` files deleted. Leaves the eager path (908 B) |
+| `authoring-conventions` | **mixed** → split | Eager + `on:`-only | heredoc clause → `lazy/rules/heredoc-quoting.md` `on: [Bash]` commands `*<<'*`, `gh issue/pr …`, `git commit*`; KISS/drafting clause stays eager (≈560 B) |
+| `pr-base-branch` | **mixed** → split | Eager + `on:`-only | PR-target MUST + Advisory → `lazy/rules/pr-base-branch.md` `on: [Bash]` `gh pr create*`/`gh pr edit*`; compare-against-`develop` clause stays eager (≈300 B) |
+| `ecc/common/git-workflow` | `git commit*`, `gh pr create*` | `on:`-only | moved to `lazy/rules/ecc/common/git-workflow.md`, `vendored: ecc` kept in the manifest. Leaves the eager path (755 B). Risk: an ECC reinstall recreates the eager copy under `rules/ecc/common/` — `rules` scan is depth-1 and will not flag it |
+| `ask-before-test-changes` | writes to code files | `on:`-only (since Task 2.3) | `paths:` proxy deleted — redundant once the body is hook-served |
+| `ecc/typescript/*` ×5 | writes to JS/TS | `on:`-only (since Task 2.3) | Task 3.4: `../common/X.md` → `../../../../rules/ecc/common/X.md`, resolves in the installed layout |
+| `plan`, `research-ops` | tool / prompt events | M4 one-off hooks | unchanged — Task 6.3 decides |
+| `plan-approval-trust`, `worktree-isolation`, `archiving`, `goal-focus-chore-deferral`, `active-session-hooks`, `web-research-tool-selection`, `context7` (kept by user decision), `hooks-todowrite-practices` (pending Task 3.3's `TodoWrite` check) | no matchable trigger | **M1 eager** | none |
+| `pr-review`, `knowledge-ops-defaults`, repo copy of `web-research-tool-selection` | — | **Cut** | Task 3.3 |
+
+Result: zero M2 proxies remain; no file mixes two trigger shapes; `lazy/rules/` holds only hook-served bodies (`ask-before-test-changes`, `heredoc-quoting`, `plan`, `pr-base-branch`, `research-ops`, `ecc/common/git-workflow`, `ecc/typescript/*`).
+
 ---
 
 ## 4. Cross-cutting issues

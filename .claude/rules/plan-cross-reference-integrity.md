@@ -1,6 +1,9 @@
 ---
 paths:
   - ".claude/plans/**/*.md"
+on:
+  tools: [Edit, Write]
+  paths: [".claude/plans/**/*.md"]
 ---
 
 # Plan Cross-Reference Integrity
