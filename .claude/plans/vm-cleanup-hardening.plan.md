@@ -231,7 +231,7 @@ above: `/validate-artifact .claude/scripts/vm-cleanup.sh` and
 - [x] **AC5** — A second identical `--clean --risky` run performs no further destructive
   action and exits 0.
 - [x] **AC6** — A failing action causes non-zero exit and appears in the Summary.
-- [ ] **AC7** — `18ceb9d` is fully landed on **this branch**: the guard, the promoted test,
+- [x] **AC7** — `18ceb9d` is fully landed on **this branch**: the guard, the promoted test,
   the runner, and the CI workflow are all present. Reaching `develop` is a post-plan PR
   merge, outside Tasks 1–7 — this AC closes at branch level here, and for real on that merge.
 
@@ -244,13 +244,14 @@ above: `/validate-artifact .claude/scripts/vm-cleanup.sh` and
 - [ ] **AC10** — ≥90% line coverage via `kcov`, or an explicitly documented, justified gap.
 - [ ] **AC11** — `bash .claude/tests/run-all.sh` fully green, including the mandatory
   second isolated-environment pass.
-- [ ] **AC12** — `shellcheck .claude/scripts/vm-cleanup.sh` clean (baseline today: 8
+- [x] **AC12** — `shellcheck .claude/scripts/vm-cleanup.sh` clean (baseline today: 8
   low-severity findings — 2× SC2088, 1× SC2012, 5× SC2059 — 0 error-severity; confirm
-  still clean or improved).
-- [ ] **AC13** — docs match `--help` output exactly, both directions.
-- [ ] **AC14** — `.claude/commands/vm-cleanup.md` exists in-repo and is registered in
+  still clean or improved). Still 8 after Tasks 1-6 (Task 4 introduced a transient
+  SC2329 false positive, suppressed with a documented `shellcheck disable` comment).
+- [x] **AC13** — docs match `--help` output exactly, both directions.
+- [x] **AC14** — `.claude/commands/vm-cleanup.md` exists in-repo and is registered in
   `manifest.yaml`.
-- [ ] **AC15** — `/validate-artifact` passes clean on both the script and the command file.
+- [x] **AC15** — `/validate-artifact` passes clean on both the script and the command file.
 
 ## Risks
 

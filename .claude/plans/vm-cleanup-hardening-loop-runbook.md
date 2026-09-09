@@ -49,7 +49,7 @@ which does not exist until Task 1 completes it.
 | 3 | Task 3 | Rewrite `--help` to explain both SAFE/RISKY tiers | done |
 | 4 | Task 4 | Harden exit codes (script currently always exits 0) | done |
 | 5 | Task 5 | Idempotency check (second `--clean --risky` run is a no-op) | done |
-| 6 | Task 6 | Command file (`.claude/commands/vm-cleanup.md`), manifest registration, docs | pending |
+| 6 | Task 6 | Command file (`.claude/commands/vm-cleanup.md`), manifest registration, docs | done |
 | 7 | Task 7 | Coverage — wire `kcov`, close gaps toward 90% | pending |
 
 ## Stop Condition Check
