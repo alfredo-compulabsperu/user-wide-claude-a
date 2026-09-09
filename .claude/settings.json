@@ -1,9 +1,12 @@
 {
   "enabledPlugins": {
-    "ecc@ecc": true,
+    "ecc@ecc": false,
     "claude-md-management@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
     "github@claude-plugins-official": true,
-    "skill-creator@claude-plugins-official": true
+    "skill-creator@claude-plugins-official": true,
+    "exa@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "firecrawl@claude-plugins-official": true
   }
 }
