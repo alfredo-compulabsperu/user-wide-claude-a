@@ -4,9 +4,12 @@
 # Covers:
 #   - issue #36 Fix 1 (worktree removal leaves no husk)
 #   - issue #36 Fix 2 (protection scan reaches depth 6, preserves relative path)
-#   - the section 10 worktree guards (locked / dirty are never touched)
+#   - the section 10 worktree guards: locked, dirty, no-upstream, ahead-of-upstream,
+#     unreadable status, and the invoking worktree itself ("self") are never touched
 #   - section 9 (node_modules) honouring the same active-tree signal, and
 #     still reclaiming node_modules from trees nobody is working in
+#   - scan mode (no flags) mutates nothing
+#   - a rescue that fails aborts the removal, leaving the worktree in place
 #
 # Promoted from .claude/tdd/test-vm-cleanup-issue-36.sh so it runs as part of
 # the standing suite. Both args are optional now.
@@ -92,14 +95,45 @@ mk_node_modules wt-dirty
 mk_node_modules wt-locked
 mk_node_modules mainrepo
 
+# ── AC1 gap fixtures: no-upstream, ahead-of-upstream, unreadable status ──────
+NOUP_WT="$HOME_DIR/projects/wt-noupstream"
+git -C "$REPO" worktree add -q "$NOUP_WT" -b wt-noupstream-br   # never pushed → no upstream
+
+AHEAD_WT="$HOME_DIR/projects/wt-ahead"
+git -C "$REPO" worktree add -q "$AHEAD_WT" -b wt-ahead-br
+git -C "$AHEAD_WT" push -qu origin wt-ahead-br
+echo more >> "$AHEAD_WT/base.txt"
+git -C "$AHEAD_WT" commit -qam "local-only commit"               # ahead by 1, unpushed
+
+UNREAD_WT="$HOME_DIR/projects/wt-unreadable"
+git -C "$REPO" worktree add -q "$UNREAD_WT" -b wt-unreadable-br
+git -C "$UNREAD_WT" push -qu origin wt-unreadable-br
+echo "gitdir: /nonexistent/broken-gitdir" > "$UNREAD_WT/.git"     # corrupt gitfile → status errors
+
+FAIL=0
+pass() { echo "PASS: $1"; }
+fail() { echo "FAIL: $1"; FAIL=1; }
+
+# ── Run 1: scan mode (no flags) — AC4, must mutate nothing ───────────────────
+WT_LIST_BEFORE=$(git -C "$REPO" worktree list --porcelain)
+OUT_SCAN=$(cd "$SANDBOX" && bash "$SCRIPT" 2>&1)
+WT_LIST_AFTER_SCAN=$(git -C "$REPO" worktree list --porcelain)
+
+[[ "$WT_LIST_BEFORE" == "$WT_LIST_AFTER_SCAN" ]] \
+  && [[ -d "$HOME_DIR/projects/wt-dirty/node_modules" ]] \
+  && [[ -d "$HOME_DIR/projects/wt-locked/node_modules" ]] \
+  && [[ -d "$REPO/node_modules" ]] \
+  && [[ ! -d "$HOME_DIR/.claude/cleanup-rescue" ]] \
+  && grep -q "Scan complete" <<<"$OUT_SCAN" \
+  && pass "scan mode (no flags) mutates nothing" \
+  || fail "scan mode (no flags) mutates nothing"
+
+# ── Run 2: --clean --yes (main destructive run) ──────────────────────────────
 OUT=$(cd "$SANDBOX" && bash "$SCRIPT" --clean --yes 2>&1)
 RC=$?
 printf '%s\n' "$OUT" > "$SANDBOX/run.log"
 
 WT_LIST=$(git -C "$REPO" worktree list --porcelain)
-FAIL=0
-pass() { echo "PASS: $1"; }
-fail() { echo "FAIL: $1"; FAIL=1; }
 
 [[ $RC -eq 0 ]] \
   && pass "script exits 0" || fail "script exits 0 (got $RC)"
@@ -145,6 +179,49 @@ grep -q "projects/wt-dirty" <<<"$WT_LIST" && [[ -f "$HOME_DIR/projects/wt-dirty/
 [[ ! -d "$REPO/node_modules" ]] \
   && pass "node_modules in an IDLE tree is still reclaimed" \
   || fail "node_modules in an IDLE tree is still reclaimed"
+
+# ── AC1 gaps: no-upstream, ahead-of-upstream, unreadable status ─────────────
+grep -q "projects/wt-noupstream" <<<"$WT_LIST" && grep -q "no upstream tracking branch" <<<"$OUT" \
+  && pass "worktree with no upstream tracking branch is left in place" \
+  || fail "worktree with no upstream tracking branch is left in place"
+
+grep -q "projects/wt-ahead" <<<"$WT_LIST" && grep -q "ahead of upstream" <<<"$OUT" \
+  && pass "worktree ahead of upstream (unpushed commits) is left in place" \
+  || fail "worktree ahead of upstream (unpushed commits) is left in place"
+
+grep -q "projects/wt-unreadable" <<<"$WT_LIST" && grep -q "cannot read status" <<<"$OUT" \
+  && pass "worktree with unreadable git status is left in place" \
+  || fail "worktree with unreadable git status is left in place"
+
+# ── Run 3: AC3 — a rescue that fails aborts the removal ─────────────────────
+# cleanup-rescue already exists after Run 2 (wt-shallow/wt-deep rescues created
+# it); making it read-only forces the next mkdir -p inside it to fail without
+# touching any rescue that already happened.
+chmod 555 "$HOME_DIR/.claude/cleanup-rescue"
+mk_wt wt-rescuefail ".env"
+OUT_RESCUEFAIL=$(cd "$SANDBOX" && bash "$SCRIPT" --clean --yes 2>&1)
+WT_LIST_RESCUEFAIL=$(git -C "$REPO" worktree list --porcelain)
+chmod 755 "$HOME_DIR/.claude/cleanup-rescue"
+
+grep -q "projects/wt-rescuefail" <<<"$WT_LIST_RESCUEFAIL" \
+  && [[ -f "$HOME_DIR/projects/wt-rescuefail/.env" ]] \
+  && grep -q "rescue FAILED" <<<"$OUT_RESCUEFAIL" \
+  && pass "a rescue that fails aborts the removal (worktree left in place)" \
+  || fail "a rescue that fails aborts the removal (worktree left in place)"
+
+# Tear down explicitly so the next run doesn't depend on whether a later
+# invocation happens to make the rescue succeed instead.
+git -C "$REPO" worktree remove --force "$HOME_DIR/projects/wt-rescuefail" 2>/dev/null || true
+
+# ── Run 4: AC1 — the invoking worktree itself is never touched ("self") ─────
+mk_wt wt-self   # clean, pushed, no protected files -- otherwise fully eligible for plain removal
+SELF_WT="$HOME_DIR/projects/wt-self"
+OUT_SELF=$(cd "$SELF_WT" && bash "$SCRIPT" --clean --yes 2>&1)
+WT_LIST_SELF=$(git -C "$REPO" worktree list --porcelain)
+
+grep -q "projects/wt-self" <<<"$WT_LIST_SELF" && grep -q "current worktree" <<<"$OUT_SELF" \
+  && pass "the invoking worktree itself is never removed, even though otherwise eligible" \
+  || fail "the invoking worktree itself is never removed, even though otherwise eligible"
 
 echo
 if [[ $FAIL -eq 0 ]]; then
