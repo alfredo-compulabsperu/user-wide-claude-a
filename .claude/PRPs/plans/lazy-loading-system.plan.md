@@ -170,7 +170,7 @@ deny() {
 
 **Task 1.1: Add `hooks` and `lazy` manifest sections**
 - **ACTION**: Add two sections to `manifest.yaml`.
-- **IMPLEMENT**: `hooks:` entries as `- name: <file>` + `executable: true` for `.sh`/`.py`. `lazy:` entries as `- name: rules/<file>.md` (nested path in the name, since `lazy/rules/` has depth).
+- **IMPLEMENT**: `hooks:` entries as `- name: <file>` + `executable: true` for `.sh`/`.py`. `lazy:` entries as `- name: rules/<file>.md` (nested path in the name, since `lazy/rules/` has depth). Also allow an optional `vendored: ecc@<version>` key on any entry (used by Task 1.3 for ECC-shipped files); `yaml_get_names` reads only `name`, so an extra key is inert to sync — it is documentation for the drift-recovery runbook, not behavior.
 - **MIRROR**: `MANIFEST_SECTION`.
 - **GOTCHA**: `yaml_get_names` (sync.sh:70-80) returns `item['name']` verbatim — a nested `rules/foo.md` name works only because `install_file` does `mkdir -p "$(dirname "$dest")"` (sync.sh:184). Verify that before relying on it.
 - **VALIDATE**: `python3 -c "import yaml;d=yaml.safe_load(open('manifest.yaml'));print(d['hooks'],d['lazy'])"`
@@ -185,7 +185,8 @@ deny() {
 **Task 1.3: Import current artifacts into the repo**
 - **ACTION**: Copy the live files from `~/.claude` into `.claude/`, then commit.
 - **IMPLEMENT**: `rules/*.md` (all 24), `lazy/rules/**/*.md` (13), `hooks/*.py` + `*.sh` (the 10 live ones — **not** the 3 marked for deletion).
-- **GOTCHA**: `~/.claude/rules/ecc/**` is **vendored** — an ECC reinstall overwrites it. Run `diff -r` against the ECC source before importing, and record in `docs/` which files are ours vs. vendored, or the next reinstall silently reverts this work (audit #K).
+- **GOTCHA**: parts of `~/.claude/rules/ecc/**` are **vendored** — an ECC reinstall overwrites them. Run `diff -r` against the ECC source before importing and record ours-vs-vendored per file in `docs/` (audit #K). **Vendored does not mean excluded**: track vendored files too, with a `vendored: ecc@<version>` marker in the manifest entry, so `sync.sh`'s three-way SHA detection reports an ECC overwrite as `[DIVERGED]` with the repo copy as merge base — instead of the overwrite silently reverting any `on:` frontmatter or customization. Same pattern as `tdd-workflow/SKILL.md`'s `customized: true` note, but enforced by sync rather than by prose.
+- **GOTCHA 2 — directory is not origin.** `ecc/common/hooks-todowrite-practices.md` lives in the ECC directory but is absent from every ECC cache version (user-owned, mtime 2026-08-24). Classify every `ecc/**` file by cache match, not path: the 213 skills/commands and 4 scripts below were checked that way; the `rules/ecc/**` and `lazy/rules/ecc/**` files were not until 2026-09-09, when the first one checked turned out to be misclassified. Re-run the check across all of them before importing.
 - **VALIDATE**: `bash sync.sh --dry-run` now reports every entry as in-sync (no `[MISSING]`, no drift).
 
 **Drift-check finding (2026-09-09), refining the scope of this task:** re-running `sync.sh --dry-run`'s local-only scan found **256 files** running outside this repo's tracking entirely — not the 1 an earlier, narrower grep had suggested. Breakdown by category and confirmed origin:
@@ -254,9 +255,10 @@ deny() {
 - **VALIDATE**: Read a matching file; full rule text arrives with no "go read X" indirection.
 
 **Task 3.3: Delete redundant eager rules**
-- **ACTION**: Remove `pr-review.md`, `context7.md`, `knowledge-ops-defaults.md`, the duplicate repo `web-research-tool-selection.md`, and the two eager `ecc/common/*`.
+- **ACTION**: Remove `pr-review.md`, `context7.md`, `knowledge-ops-defaults.md` and the duplicate repo `web-research-tool-selection.md`. **Not** the two eager `ecc/common/*` (reclassified 2026-09-09, audit §3 correction): `git-workflow.md` → M5 `on.commands` (`git commit`, `gh pr create`) in Task 3.1; `hooks-todowrite-practices.md` → keep eager, but first check whether `TodoWrite` still exists in the harness — it is absent from the current session's tool list, and if it is gone the rule is dead content and *then* gets deleted.
+- **SUB-CASES**: `pr-review` and `knowledge-ops-defaults` are *fold-then-delete* — content moves into the matching skill first, and the ECC plugin (which owns `knowledge-ops`) is currently disabled, so the fold target must be enabled to do it. `context7` is *delete-when-unblocked* (next GOTCHA).
 - **GOTCHA**: `context7.md` is only redundant *while* the context7 plugin is installed — and it failed to connect this session (`AUTH_HEADER_REJECTED`). Confirm the plugin is working before deleting the rule, or the guidance disappears entirely.
-- **VALIDATE**: Session-start eager load drops by ≥5,260 B. Measure with the audit §3 byte script.
+- **VALIDATE**: Session-start eager load drops by ≥4,180 B (was 5,260 before the `ecc/common/*` reclassification). Measure with the audit §3 byte script.
 
 **Task 3.4: Fix the dangling ECC links**
 - **ACTION**: Repair the first line of all 5 `lazy/rules/ecc/typescript/*.md`.
@@ -355,7 +357,7 @@ EXPECT: JSON with `additionalContext` on first run, empty on second
 cd ~/.claude/rules && e=0; for f in *.md ecc/common/*.md; do \
   sed -n '1,10p' "$f" | grep -q '^paths:' || e=$((e+$(wc -c < "$f"))); done; echo "$e"
 ```
-EXPECT: ≤ 13,500 bytes (from 18,759)
+EXPECT: ≤ 14,600 bytes (from 18,759; Cut bucket is 4,180 B after the `ecc/common/*` reclassification — the M5 bucket's 6,328 B stops loading eagerly only once Phase 2 is live and those rules leave the eager path)
 
 ### Manual Validation
 - [ ] Fresh session: edit a `.ts` file → rule text appears **before** the write lands
@@ -372,7 +374,7 @@ EXPECT: ≤ 13,500 bytes (from 18,759)
 - [ ] One `PreToolUse` injector replaces both old ones; both deleted (the four remaining one-off injectors are a separate, deferred decision — Task 6.3)
 - [ ] Injection fires **before** writes and dedupes per `(rule, subject)`
 - [ ] 40-edit trace costs ≈6,450 tok, not ≈86,000
-- [ ] Eager session load reduced by ≥5,260 B
+- [ ] Eager session load reduced by ≥4,180 B from cuts alone, ≥10,508 B once M5 carries the write- and command-triggered rules
 - [ ] `gh-branch-guard.sh` can actually deny
 - [ ] Secret scanner fails closed
 - [ ] Hook test suite exists and passes, with RED evidence recorded from before the injector existed (Task 2.1) and GREEN evidence from the unmodified same tests after (Task 2.2)

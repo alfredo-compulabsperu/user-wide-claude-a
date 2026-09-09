@@ -112,12 +112,12 @@ When an M2 proxy fires you get a **pointer, not a rule**. That costs:
 | `context7.md` | 1308 | Now **redundant** — the context7 plugin ships its own MCP server instructions saying the same thing | Delete | Cut |
 | `goal-focus-chore-deferral.md` | 996 | Also exists as a skill | Check overlap, keep one | Review |
 | `hooks.md` | 908 | **3-way topic collision** with `hook-path-convention.md` + `ecc/common/hooks.md` | Merge into one | Merge |
-| `ecc/common/git-workflow.md` | 755 | Vendored ECC, overwritten on reinstall | Audit says delete | Cut |
+| `ecc/common/git-workflow.md` | 755 | Vendored ECC (byte-identical to cache 2.2.0; already stale vs 2.2.1, which rewrote line 12). Both sections are command-triggerable: commit format on `git commit`, PR workflow on `gh pr create` | → **M5** `on.commands`; track in the repo with a `vendored: ecc@2.2.0` marker so an ECC overwrite shows as `[DIVERGED]` instead of silently reverting | M5 |
 | `plan-approval-trust.md` | 651 | No matchable trigger (judgment/behavioral) | Keep eager | Keep |
 | `worktree-isolation.md` | 558 | Session-wide, no matchable trigger | Keep eager | Keep |
 | `pr-base-branch.md` | 539 | No file glob, but Bash-hookable on `gh pr create` | Keep eager, or **M4** on Bash | Keep |
 | `active-session-hooks.md` | 409 | **Documents a gate that's already off** (`GATEGUARD_BASH_ROUTINE_DISABLED=1`) | Fix claim or delete | Fix |
-| `ecc/common/hooks-todowrite-practices.md` | 325 | Vendored ECC | Audit says delete | Cut |
+| `ecc/common/hooks-todowrite-practices.md` | 325 | **Not vendored** — absent from every ECC cache version (2.2.0, 2.2.1, all locale copies); mtime 2026-08-24, three days after the ECC batch. Misclassified by directory. Only trigger is the `TodoWrite` tool itself (no subject), and that tool is absent from the current harness tool list | Keep eager pending a `TodoWrite`-exists check; if it exists, tools-only trigger via plan Task 6.3; if not, delete as dead content | Keep |
 | `archiving.md` | 324 | No matchable trigger (prose) | Keep eager | Keep |
 | `knowledge-ops-defaults.md` | 243 | Tiny, belongs to a skill | Fold into `knowledge-ops` | Cut |
 | **Total** | **18,759** | | | |
@@ -126,11 +126,13 @@ When an M2 proxy fires you get a **pointer, not a rule**. That costs:
 
 | Bucket | Files | Bytes | Requires |
 |---|---|---:|---|
-| **Cut** | `pr-review`, `context7`, `knowledge-ops-defaults`, `ecc/common/git-workflow`, `ecc/common/hooks-todowrite-practices` | 5,260 | deletion only |
-| **Move → M4** | `settings-json-secrets`, `secrets-and-env` | 5,573 | writing two `PreToolUse` injectors |
-| **Immediately actionable** | Cut bucket only | **5,260 B ≈ 1,315 tok** | **28%** |
-| **After M4 injectors exist** | both buckets | **10,833 B ≈ 2,708 tok** | **58%** |
-| **Remaining eager (best case)** | | 7,926 B ≈ 1,982 tok | |
+| **Cut** | `pr-review`, `context7`, `knowledge-ops-defaults` | 4,180 | deletion only (`context7` blocked while the plugin is auth-rejected) |
+| **Move → M5** | `settings-json-secrets`, `secrets-and-env`, `ecc/common/git-workflow` | 6,328 | the `PreToolUse` injector (plan Phase 2) |
+| **Immediately actionable** | Cut bucket only | **4,180 B ≈ 1,045 tok** | **22%** |
+| **After M5 exists** | both buckets | **10,508 B ≈ 2,627 tok** | **56%** |
+| **Remaining eager (best case)** | | 8,251 B ≈ 2,063 tok | |
+
+> **Correction (2026-09-09):** an earlier revision put both `ecc/common/*` eager files in the Cut bucket as "vendored, overwritten on reinstall". Diffing against the ECC cache showed `hooks-todowrite-practices.md` is not vendored at all (user-owned, never shipped by ECC), and `git-workflow.md` is vendored but fully command-triggerable — being vendored is a reason to *track and detect divergence*, not to delete. Cut drops from 5,260 B to 4,180 B; the difference moves to M5 and Keep.
 
 Separately, deleting the duplicated repo copy of `web-research-tool-selection.md` saves another 1,708 B of session context.
 
@@ -250,7 +252,7 @@ Read through §0: the "18 rules withheld… governing nothing" clause is a **cla
 **Then deletions**
 
 9. `diff -r` vendored ECC rules before deleting anything
-10. Delete `hooks.json`, `hooks/README.md`, `plans-index-guard.py`, `hooks/tests/`, `noop-bash-guard.py`, eager `rules/ecc/common/*`
+10. Delete `hooks.json`, `hooks/README.md`, `plans-index-guard.py`, `hooks/tests/`, `noop-bash-guard.py` (the two eager `rules/ecc/common/*` were removed from this list 2026-09-09 — see §3 correction)
 11. **"Resolve every `paths:`-gated rule: promote to eager prose, back with a hook, or delete. No third state."**
 
 **Also raised (Set C)**
