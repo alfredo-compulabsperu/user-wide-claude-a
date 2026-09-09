@@ -9,6 +9,23 @@ MOCK_BIN="$(mktemp -d)"
 
 trap 'rm -rf "$MOCK_BIN"' EXIT
 
+# ---------------------------------------------------------------------------
+# Install no-op launcher shims — any call is recorded, never exec'd for real
+# ---------------------------------------------------------------------------
+cat > "$MOCK_BIN/xdg-open" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >> "$(dirname "$0")/launcher.calls"
+exit 0
+EOF
+chmod +x "$MOCK_BIN/xdg-open"
+
+cat > "$MOCK_BIN/open" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >> "$(dirname "$0")/launcher.calls"
+exit 0
+EOF
+chmod +x "$MOCK_BIN/open"
+
 pass=0
 fail=0
 
@@ -124,7 +141,7 @@ fi
 # ---------------------------------------------------------------------------
 # Test 8: open_urls prints each URL to stdout
 # ---------------------------------------------------------------------------
-output=$(bash -c ". '$LIB'; open_urls 'https://example.com/1' 'https://example.com/2'" 2>/dev/null)
+output=$(PATH="$MOCK_BIN:$PATH" bash -c ". '$LIB'; open_urls 'https://example.com/1' 'https://example.com/2'" 2>/dev/null)
 expected=$'https://example.com/1\nhttps://example.com/2'
 if [[ "$output" == "$expected" ]]; then
   run_test "open_urls prints URLs to stdout" "pass"
@@ -132,6 +149,17 @@ else
   echo "  Expected: $(printf '%q' "$expected")"
   echo "  Got:      $(printf '%q' "$output")"
   run_test "open_urls prints URLs to stdout" "fail"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 9: open_urls never invokes a browser launcher
+# ---------------------------------------------------------------------------
+if [[ ! -f "$MOCK_BIN/launcher.calls" ]]; then
+  run_test "open_urls never invokes a browser launcher" "pass"
+else
+  echo "  Recorded launcher calls:"
+  cat "$MOCK_BIN/launcher.calls"
+  run_test "open_urls never invokes a browser launcher" "fail"
 fi
 
 # ---------------------------------------------------------------------------
