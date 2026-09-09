@@ -165,6 +165,14 @@ exact leak-prone shape that check exists for.
   which (don't invent a PASS that wasn't actually run).
 - **Mirror**: existing `[[ -d "$target" ]]` existence checks in sections 6/7/8.
 - **Validate**: `bash .claude/tests/run-all.sh`.
+- **Result**: RED case added (run `--clean --risky` twice on the same sandbox, assert
+  the second run exits 0 and `git worktree list --porcelain` is unchanged from the
+  first run) passed immediately with no script change — confirmed existing guards
+  already provide idempotency, no new PASS invented. Every section is either
+  existence-guarded before acting (`[[ -d "$target" ]] || continue` in sections 6/7/8)
+  or re-enumerates its targets fresh each run (sections 4/9/10/11 via `snap list`,
+  `find`, `git worktree list`, `ls`) so an already-removed target is simply never
+  found again, never re-attempted, and never errors.
 
 ### Task 6: Command file, manifest registration, docs
 - **Action**: Write `.claude/commands/vm-cleanup.md` (the deployed copy exists at
@@ -220,7 +228,7 @@ above: `/validate-artifact .claude/scripts/vm-cleanup.sh` and
 - [x] **AC4** — Scan mode (no flags, or `--dry-run`) mutates nothing.
 
 **Correctness**
-- [ ] **AC5** — A second identical `--clean --risky` run performs no further destructive
+- [x] **AC5** — A second identical `--clean --risky` run performs no further destructive
   action and exits 0.
 - [x] **AC6** — A failing action causes non-zero exit and appears in the Summary.
 - [ ] **AC7** — `18ceb9d` is fully landed on **this branch**: the guard, the promoted test,

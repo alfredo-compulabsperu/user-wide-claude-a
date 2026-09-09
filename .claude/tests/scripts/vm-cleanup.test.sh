@@ -193,6 +193,15 @@ grep -q "projects/wt-unreadable" <<<"$WT_LIST" && grep -q "cannot read status" <
   && pass "worktree with unreadable git status is left in place" \
   || fail "worktree with unreadable git status is left in place"
 
+# ── Run 9: AC5 — idempotency: a second identical run is a no-op, exits 0 ───
+OUT2=$(cd "$SANDBOX" && bash "$SCRIPT" --clean --risky 2>&1)
+RC2=$?
+WT_LIST2=$(git -C "$REPO" worktree list --porcelain)
+
+[[ $RC2 -eq 0 ]] && [[ "$WT_LIST2" == "$WT_LIST" ]] \
+  && pass "a second identical --clean --risky run performs no further destructive action and exits 0" \
+  || fail "a second identical --clean --risky run performs no further destructive action and exits 0"
+
 # ── Run 3: AC3 — a rescue that fails aborts the removal ─────────────────────
 # cleanup-rescue already exists after Run 2 (wt-shallow/wt-deep rescues created
 # it); making it read-only forces the next mkdir -p inside it to fail without
