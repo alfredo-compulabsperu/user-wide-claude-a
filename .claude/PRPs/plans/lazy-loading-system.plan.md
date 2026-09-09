@@ -388,7 +388,7 @@ EXPECT: ≤ 15,900 bytes (from 18,759; Cut bucket is 2,872 B after `context7.md`
 - [ ] Eager session load reduced by ≥2,872 B from cuts alone, ≥9,200 B once M5 carries the write- and command-triggered rules
 - [ ] `gh-branch-guard.sh` can actually deny
 - [ ] Secret scanner fails closed
-- [ ] Hook test suite exists and passes, with RED evidence recorded from before the injector existed (Task 2.1) and GREEN evidence from the unmodified same tests after (Task 2.2)
+- [x] Hook test suite exists and passes, with RED evidence recorded from before the injector existed (Task 2.1) and GREEN evidence from the unmodified same tests after (Task 2.2) — done 2026-09-09: RED `4c9ae02` (12 failed, 0 import errors), GREEN `c4ce66d` (12 passed, test file unchanged); report in `.claude/tdd/lazy-loading-system.tdd.md`
 - [ ] `hook-path-convention` fires, or its failure is documented and reproducible
 
 ---
