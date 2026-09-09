@@ -88,11 +88,13 @@ for p in d.get('plugins', []):
 PYEOF
 }
 
-yaml_get_scripts() {
-  MANIFEST_PATH="$MANIFEST" python3 - <<'PYEOF'
+# yaml_get_executables <section>: "name|true|false" per entry, for sections whose
+# entries may carry `executable: true` (scripts, hooks)
+yaml_get_executables() {
+  MANIFEST_PATH="$MANIFEST" SECTION="$1" python3 - <<'PYEOF'
 import yaml, os
 d = yaml.safe_load(open(os.environ['MANIFEST_PATH']))
-for s in d.get('scripts', []):
+for s in d.get(os.environ['SECTION'], []):
     exe = 'true' if s.get('executable') else 'false'
     print(s['name'] + '|' + exe)
 PYEOF
@@ -120,7 +122,7 @@ import yaml, os, sys
 try:
   d = yaml.safe_load(open(os.environ['MANIFEST_PATH']))
   issues = []
-  for section in ['skills', 'commands', 'agents', 'scripts', 'output_styles', 'rules']:
+  for section in ['skills', 'commands', 'agents', 'scripts', 'output_styles', 'rules', 'hooks', 'lazy']:
     for i, entry in enumerate(d.get(section, [])):
       if isinstance(entry, dict):
         if not entry.get('name'):
@@ -447,12 +449,15 @@ scan_local_only() {
   local manifest_names
   manifest_names=$(yaml_get_names "$type") || { echo "  WARN: manifest parse failed for $type scan" >&2; return; }
 
-  # skills are dirs at depth 1; commands may have one subdir level; agents/scripts are flat files
+  # skills are dirs at depth 1; commands may have one subdir level; lazy bodies nest
+  # arbitrarily (rules/ecc/typescript/*.md); agents/scripts/hooks/rules are flat files
   local find_args=()
   if [[ "$type" == "skills" ]]; then
     find_args=(-maxdepth 1 -mindepth 1 -type d)
   elif [[ "$type" == "commands" ]]; then
     find_args=(-maxdepth 2 -mindepth 1 -type f)
+  elif [[ "$type" == "lazy" ]]; then
+    find_args=(-mindepth 1 -type f)
   else
     find_args=(-maxdepth 1 -mindepth 1 -type f)
   fi
@@ -516,18 +521,35 @@ while IFS= read -r name <&3; do
   install_file "$REPO_DIR/.claude/output-styles/$name" "$CLAUDE_DIR/output-styles/$name" "output-styles/$name"
 done 3<<< "$names"
 
+# install_executables <section>: install_file each entry, then chmod +x the ones flagged
+# executable — cp does not reliably preserve the bit across filesystems
+install_executables() {
+  local section="$1" entries name executable dest
+  entries=$(yaml_get_executables "$section") || { echo "ERROR: manifest parse failed for $section" >&2; exit 1; }
+  while IFS= read -r entry <&3; do
+    [[ -n "$entry" ]] || continue
+    name="${entry%%|*}"
+    executable="${entry##*|}"
+    dest="$CLAUDE_DIR/$section/$name"
+    install_file "$REPO_DIR/.claude/$section/$name" "$dest" "$section/$name"
+    if [[ "$executable" == "true" && -f "$dest" && $DRY_RUN -eq 0 ]]; then
+      chmod +x "$dest"
+    fi
+  done 3<<< "$entries"
+}
+
 echo "--- scripts ---"
-scripts=$(yaml_get_scripts) || { echo "ERROR: manifest parse failed for scripts" >&2; exit 1; }
-while IFS= read -r entry <&3; do
-  [[ -n "$entry" ]] || continue
-  name="${entry%%|*}"
-  executable="${entry##*|}"
-  dest="$CLAUDE_DIR/scripts/$name"
-  install_file "$REPO_DIR/.claude/scripts/$name" "$dest" "scripts/$name"
-  if [[ "$executable" == "true" && -f "$dest" && $DRY_RUN -eq 0 ]]; then
-    chmod +x "$dest"
-  fi
-done 3<<< "$scripts"
+install_executables scripts
+
+echo "--- hooks ---"
+install_executables hooks
+
+echo "--- lazy ---"
+names=$(yaml_get_names lazy) || { echo "ERROR: manifest parse failed for lazy" >&2; exit 1; }
+while IFS= read -r name <&3; do
+  [[ -n "$name" ]] || continue
+  install_file "$REPO_DIR/.claude/lazy/$name" "$CLAUDE_DIR/lazy/$name" "lazy/$name"
+done 3<<< "$names"
 
 echo "--- claude_md ---"
 portable=$(yaml_get_claude_md_portable) || { echo "ERROR: manifest parse failed for claude_md" >&2; exit 1; }
@@ -553,6 +575,8 @@ scan_local_only agents   "$CLAUDE_DIR/agents"
 scan_local_only rules    "$CLAUDE_DIR/rules"
 scan_local_only scripts  "$CLAUDE_DIR/scripts"
 scan_local_only output_styles "$CLAUDE_DIR/output-styles"
+scan_local_only hooks    "$CLAUDE_DIR/hooks"
+scan_local_only lazy     "$CLAUDE_DIR/lazy"
 
 echo ""
 echo "=== summary ==="
