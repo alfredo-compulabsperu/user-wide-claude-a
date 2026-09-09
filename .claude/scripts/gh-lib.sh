@@ -20,14 +20,8 @@ resolve_github_base_url() {
   }
 }
 
-# open_urls: print each URL to stdout, then try to open them in the system browser.
-# Browser failures are intentionally suppressed — printing URLs is the primary contract.
+# open_urls: print each URL to stdout. Display-only by design — never launches a browser.
 open_urls() {
   local urls=("$@")
   for url in "${urls[@]}"; do echo "$url"; done
-  if command -v xdg-open &>/dev/null; then
-    for url in "${urls[@]}"; do xdg-open "$url" &>/dev/null & disown; done
-  elif command -v open &>/dev/null; then
-    for url in "${urls[@]}"; do open "$url" &>/dev/null & disown; done
-  fi
 }

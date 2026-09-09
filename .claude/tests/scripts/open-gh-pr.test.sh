@@ -9,6 +9,23 @@ MOCK_BIN="$(mktemp -d)"
 
 trap 'rm -rf "$MOCK_BIN"' EXIT
 
+# ---------------------------------------------------------------------------
+# Install no-op launcher shims — any call is recorded, never exec'd for real
+# ---------------------------------------------------------------------------
+cat > "$MOCK_BIN/xdg-open" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >> "$(dirname "$0")/launcher.calls"
+exit 0
+EOF
+chmod +x "$MOCK_BIN/xdg-open"
+
+cat > "$MOCK_BIN/open" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >> "$(dirname "$0")/launcher.calls"
+exit 0
+EOF
+chmod +x "$MOCK_BIN/open"
+
 pass=0
 fail=0
 
@@ -108,6 +125,17 @@ else
   echo "  Expected: $expected"
   echo "  Got:      $output"
   run_test "git@ remote resolved to correct pull URL" "fail"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 7: never invokes a browser launcher
+# ---------------------------------------------------------------------------
+if [[ ! -f "$MOCK_BIN/launcher.calls" ]]; then
+  run_test "never invokes a browser launcher" "pass"
+else
+  echo "  Recorded launcher calls:"
+  cat "$MOCK_BIN/launcher.calls"
+  run_test "never invokes a browser launcher" "fail"
 fi
 
 # ---------------------------------------------------------------------------
