@@ -8,9 +8,18 @@
 # See ~/.claude/rules/settings-json-secrets.md.
 set -euo pipefail
 
+# Fail closed: this guard protects the one file class that once held a live
+# PAT, so a missing or failing jq must deny, not silently allow.
+blocked() {
+  echo "BLOCKED: $1 -- refusing the write rather than skipping the secret check." >&2
+  exit 2
+}
+
+command -v jq >/dev/null 2>&1 || blocked "jq is not installed, cannot inspect the payload"
+
 payload="$(cat)"
 
-file_path="$(jq -r '.tool_input.file_path // empty' <<<"$payload" 2>/dev/null || true)"
+file_path="$(jq -r '.tool_input.file_path // empty' <<<"$payload")" || blocked "jq could not parse the hook payload"
 [ -z "$file_path" ] && exit 0
 
 base="$(basename -- "$file_path")"
@@ -23,7 +32,7 @@ text="$(jq -r '
   [.tool_input.content, .tool_input.new_string,
    (.tool_input.edits // [])[]?.new_string]
   | map(select(. != null)) | join("\n")
-' <<<"$payload" 2>/dev/null || true)"
+' <<<"$payload")" || blocked "jq could not extract the written content"
 [ -z "$text" ] && exit 0
 
 pattern='gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-(ant-|proj-)?[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{35}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'

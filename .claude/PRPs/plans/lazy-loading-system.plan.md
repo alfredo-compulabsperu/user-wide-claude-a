@@ -386,8 +386,8 @@ EXPECT: ≤ 15,900 bytes (from 18,759; Cut bucket is 2,872 B after `context7.md`
 - [x] Injection fires **before** writes and dedupes per `(rule, subject)` — verified live 2026-09-09: `.claude/tdd/lazy-loading-system.tdd.md` § Coverage
 - [ ] 40-edit trace costs ≈6,450 tok, not ≈86,000
 - [x] Eager session load reduced by ≥2,872 B from cuts alone, ≥9,200 B once M5 carries the write- and command-triggered rules — measured 2026-09-09 with the audit byte script on `~/.claude`: 18,759 → 9,962 after Tasks 3.1/3.2 → **6,765 B** after Task 3.3 (−11,994 B, 64%)
-- [ ] `gh-branch-guard.sh` can actually deny
-- [ ] Secret scanner fails closed
+- [x] `gh-branch-guard.sh` can actually deny — 2026-09-09: `deny()` emits `hookSpecificOutput.permissionDecision: deny` via `jq -n`; moved to `.claude/hooks/`; piped `gh pr create --base main` payload → deny JSON, `--base develop` → silent (Task 5.1)
+- [x] Secret scanner fails closed — 2026-09-09: missing/failing `jq` → `exit 2` with a BLOCKED line; shadowed-`jq` run denied a benign `settings.json` write, real `jq` still denies `ghp_…` and allows benign content (Task 5.2)
 - [x] Hook test suite exists and passes, with RED evidence recorded from before the injector existed (Task 2.1) and GREEN evidence from the unmodified same tests after (Task 2.2) — done 2026-09-09: RED `4c9ae02` (12 failed, 0 import errors), GREEN `c4ce66d` (12 passed, test file unchanged); report in `.claude/tdd/lazy-loading-system.tdd.md`
 - [ ] `hook-path-convention` fires, or its failure is documented and reproducible
 

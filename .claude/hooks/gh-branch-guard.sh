@@ -17,8 +17,10 @@ fi
 PROTECTED="main|master"
 INTEGRATION="develop"
 
+# A PreToolUse decision must nest under hookSpecificOutput; a bare top-level
+# permissionDecision is ignored and exit 0 means ALLOW (audit BROKEN_DENY).
 deny() {
-  echo "{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"$1\"}"
+  jq -n --arg reason "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$reason}}'
   exit 0
 }
 

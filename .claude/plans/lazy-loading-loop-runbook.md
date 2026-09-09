@@ -38,7 +38,7 @@ Human-only. The loop MUST NOT start until every item is `[x]`.
 | 4 | Phase 3 · 3.1, 3.2, 3.4 | auto (ran in-session) | `run-all.sh` green; 3.2 read-check deferred to iteration 6's session | done — `10715bb` |
 | 5 | Phase 3 · 3.3 | auto (ran in-session) | eager-load byte script ≥ 2,872 B below 18,759 | done — see commit; `pr-review` split rather than cut, repo `web-research` copy kept (double-load finding in audit §3) |
 | 6 | Phase 4 · 4.1 (+ 3.2 read-check) | **HUMAN** | one fresh session per hypothesis; cause found or documented as reproducible | pending |
-| 7 | Phase 5 · 5.1, 5.2 | auto | `run-all.sh` green; `gh pr create --base main` denied; shadowed `jq` → deny | pending |
+| 7 | Phase 5 · 5.1, 5.2 | auto (ran in-session) | `run-all.sh` green; `gh pr create --base main` denied; shadowed `jq` → deny | done |
 | 8 | Phase 6 · 6.1, 6.2 (stretch), 6.3 (decision) | auto | no `settings.json` entry references a deleted file | pending |
 
 ## Loop Protocol (fast mode)
