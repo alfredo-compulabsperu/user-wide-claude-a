@@ -188,6 +188,20 @@ deny() {
 - **GOTCHA**: `~/.claude/rules/ecc/**` is **vendored** — an ECC reinstall overwrites it. Run `diff -r` against the ECC source before importing, and record in `docs/` which files are ours vs. vendored, or the next reinstall silently reverts this work (audit #K).
 - **VALIDATE**: `bash sync.sh --dry-run` now reports every entry as in-sync (no `[MISSING]`, no drift).
 
+**Drift-check finding (2026-09-09), refining the scope of this task:** re-running `sync.sh --dry-run`'s local-only scan found **256 files** running outside this repo's tracking entirely — not the 1 an earlier, narrower grep had suggested. Breakdown by category and confirmed origin:
+
+| Category | Count | Origin | Action |
+|---|---:|---|---|
+| `skills/` | 100 | **ECC-vendored** — confirmed via plain-file (non-symlink) matches in `~/.claude/plugins/cache/ecc/`, batch-installed 2026-08-21 | Exclude — not this repo's to track |
+| `commands/` | 113 | Same ECC batch, same confirmation method | Exclude |
+| `scripts/` | 20 | **Mixed** — see script-level breakdown below | Split: 4 exclude, 16 import |
+| `rules/` | 23 | **Not ECC** — no cache match, no ECC branding; this project's own custom rules | **In scope for this task** — matches the plan's existing "all 24" figure (23 local-only + `pr-review.md`, itself slated for deletion in Phase 3) |
+
+**Script-level breakdown** (20 total, classified by ECC-cache match + mtime clustering):
+
+- **ECC-vendored, exclude (4):** `auto-update.js`, `harness-audit.js`, `setup-package-manager.js`, `skills-health.js` — all four match files in `~/.claude/plugins/cache/ecc/` and share the exact 2026-08-21 batch-install date as the vendored skills/commands above.
+- **User-owned, import in this task (16):** `agent-token-monitor.py`, `default-branch.sh`, `gh-branch-guard.sh`, `github-mcp.sh`, `git-search-content.sh`, `git-worktrees-ahead.sh`, `git-worktrees-dirty.sh`, `git-worktrees.sh`, `lib-resolve-lan-host.sh`, `merge-default.sh`, `open-bash.sh`, `open-code-server.sh`, `open-smb-path.sh`, `restart-code-server.sh`, `tmux-ops-list-windows.sh`, `tmux-ops-move-window.sh` — no ECC-cache match, mtimes spread June–September (no batch clustering), consistent with independent, project-owned scripts. `gh-branch-guard.sh` is already separately in scope for Phase 5 (Task 5.1, its broken `deny()`); this import is a prerequisite for that fix landing under version control at all.
+
 ### Phase 2 — Retire the expensive injectors
 
 **Task 2.1: Build `lazy-rule-inject.py`**
