@@ -217,7 +217,7 @@ above: `/validate-artifact .claude/scripts/vm-cleanup.sh` and
   list`, working tree unchanged, no husk directory.
 - [x] **AC3** — Protected files are never deleted at any depth; a rescue that fails
   aborts the removal, worktree left in place.
-- [ ] **AC4** — Scan mode (no flags, or `--dry-run`) mutates nothing.
+- [x] **AC4** — Scan mode (no flags, or `--dry-run`) mutates nothing.
 
 **Correctness**
 - [ ] **AC5** — A second identical `--clean --risky` run performs no further destructive
@@ -230,7 +230,7 @@ above: `/validate-artifact .claude/scripts/vm-cleanup.sh` and
 **Usability**
 - [ ] **AC8** — `--help` names both tiers (SAFE/RISKY) and at least one example target
   from each.
-- [ ] **AC9** — `--risky` replaces `--yes`; bare `--yes` is rejected.
+- [x] **AC9** — `--risky` replaces `--yes`; bare `--yes` is rejected.
 
 **Quality**
 - [ ] **AC10** — ≥90% line coverage via `kcov`, or an explicitly documented, justified gap.

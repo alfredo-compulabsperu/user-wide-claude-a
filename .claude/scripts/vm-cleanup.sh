@@ -2,8 +2,8 @@
 # vm-cleanup.sh -- scan and clean dev VM disk consumers
 #
 # Classification:
-#   SAFE    auto-executes in --clean mode (low risk, recoverable)
-#   CONFIRM skipped in --clean mode unless --yes is also passed
+#   SAFE  auto-executes in --clean mode (low risk, recoverable)
+#   RISKY skipped in --clean mode unless --risky is also passed
 #
 # Protected files (never deleted; at any depth):
 #   .env  .env.*  *.local.json  serviceAccountKey*  *.pem  *.key  *secret*  *credential*
@@ -11,25 +11,30 @@
 # ~/.claude/cleanup-rescue/<worktree>-<timestamp>/ before the worktree is removed.
 #
 # Usage:
-#   vm-cleanup.sh              scan only; print targets with sizes
-#   vm-cleanup.sh --clean      execute SAFE; list CONFIRM targets (skipped)
-#   vm-cleanup.sh --clean --yes  execute SAFE + CONFIRM
+#   vm-cleanup.sh                scan only; print targets with sizes
+#   vm-cleanup.sh --dry-run      same as scan only, explicit alias; overrides --clean/--risky
+#   vm-cleanup.sh --clean        execute SAFE; list RISKY targets (skipped)
+#   vm-cleanup.sh --clean --risky  execute SAFE + RISKY
 
 set -euo pipefail
 
 CLEAN=false
-YES=false
+RISKY=false
+DRYRUN=false
 
 for arg in "$@"; do
   case "$arg" in
-    --clean) CLEAN=true ;;
-    --yes)   YES=true ;;
+    --clean)   CLEAN=true ;;
+    --risky)   RISKY=true ;;
+    --dry-run) DRYRUN=true ;;
     -h|--help)
       sed -n '/^# Usage/,/^[^#]/p' "$0" | grep '^#' | sed 's/^# \?//'
       exit 0 ;;
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
   esac
 done
+
+$DRYRUN && CLEAN=false
 
 # ── terminal colors (disabled when not a tty) ─────────────────────────────────
 if [[ -t 1 ]]; then
@@ -54,13 +59,13 @@ _safe() {
 
 _confirm() {
   local desc="$1"; shift
-  if $CLEAN && $YES; then
-    printf "  ${Y}[CONFIRM]${N} %s\n" "$desc"
+  if $CLEAN && $RISKY; then
+    printf "  ${Y}[RISKY]${N} %s\n" "$desc"
     "$@" 2>&1 | sed 's/^/    /' || true
   elif $CLEAN; then
-    printf "  ${Y}[CONFIRM]${N} ${R}(skipped -- rerun with --yes)${N} %s\n" "$desc"
+    printf "  ${Y}[RISKY]${N} ${R}(skipped -- rerun with --risky)${N} %s\n" "$desc"
   else
-    printf "  ${Y}[CONFIRM]${N} %s\n" "$desc"
+    printf "  ${Y}[RISKY]${N} %s\n" "$desc"
   fi
   return 0
 }
@@ -353,8 +358,8 @@ printf "  Estimated reclaimable (enumerated targets): %s\n" "$RECLAIMABLE"
 if ! $CLEAN; then
   printf "\n  ${Y}Scan complete.${N}\n"
   printf "  Run with ${B}--clean${N} to execute SAFE actions (apt, journald, npm cache, ~/.cache subdirs).\n"
-  printf "  Run with ${B}--clean --yes${N} to also execute CONFIRM actions (node_modules, worktrees, Trash, etc).\n"
-elif ! $YES; then
-  printf "\n  ${Y}SAFE actions executed. CONFIRM targets were listed but skipped.${N}\n"
-  printf "  Rerun with ${B}--clean --yes${N} to execute CONFIRM targets.\n"
+  printf "  Run with ${B}--clean --risky${N} to also execute RISKY actions (node_modules, worktrees, Trash, etc).\n"
+elif ! $RISKY; then
+  printf "\n  ${Y}SAFE actions executed. RISKY targets were listed but skipped.${N}\n"
+  printf "  Rerun with ${B}--clean --risky${N} to execute RISKY targets.\n"
 fi

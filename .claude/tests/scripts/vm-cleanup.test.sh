@@ -128,8 +128,8 @@ WT_LIST_AFTER_SCAN=$(git -C "$REPO" worktree list --porcelain)
   && pass "scan mode (no flags) mutates nothing" \
   || fail "scan mode (no flags) mutates nothing"
 
-# ── Run 2: --clean --yes (main destructive run) ──────────────────────────────
-OUT=$(cd "$SANDBOX" && bash "$SCRIPT" --clean --yes 2>&1)
+# ── Run 2: --clean --risky (main destructive run) ────────────────────────────
+OUT=$(cd "$SANDBOX" && bash "$SCRIPT" --clean --risky 2>&1)
 RC=$?
 printf '%s\n' "$OUT" > "$SANDBOX/run.log"
 
@@ -199,7 +199,7 @@ grep -q "projects/wt-unreadable" <<<"$WT_LIST" && grep -q "cannot read status" <
 # touching any rescue that already happened.
 chmod 555 "$HOME_DIR/.claude/cleanup-rescue"
 mk_wt wt-rescuefail ".env"
-OUT_RESCUEFAIL=$(cd "$SANDBOX" && bash "$SCRIPT" --clean --yes 2>&1)
+OUT_RESCUEFAIL=$(cd "$SANDBOX" && bash "$SCRIPT" --clean --risky 2>&1)
 WT_LIST_RESCUEFAIL=$(git -C "$REPO" worktree list --porcelain)
 chmod 755 "$HOME_DIR/.claude/cleanup-rescue"
 
@@ -216,12 +216,43 @@ git -C "$REPO" worktree remove --force "$HOME_DIR/projects/wt-rescuefail" 2>/dev
 # ── Run 4: AC1 — the invoking worktree itself is never touched ("self") ─────
 mk_wt wt-self   # clean, pushed, no protected files -- otherwise fully eligible for plain removal
 SELF_WT="$HOME_DIR/projects/wt-self"
-OUT_SELF=$(cd "$SELF_WT" && bash "$SCRIPT" --clean --yes 2>&1)
+OUT_SELF=$(cd "$SELF_WT" && bash "$SCRIPT" --clean --risky 2>&1)
 WT_LIST_SELF=$(git -C "$REPO" worktree list --porcelain)
 
 grep -q "projects/wt-self" <<<"$WT_LIST_SELF" && grep -q "current worktree" <<<"$OUT_SELF" \
   && pass "the invoking worktree itself is never removed, even though otherwise eligible" \
   || fail "the invoking worktree itself is never removed, even though otherwise eligible"
+
+# ── Run 5: Task 2 — --risky replaces --yes; bare --yes rejected ─────────────
+mk_wt wt-risky-check ".env"
+
+OUT_OLDYES=$(cd "$SANDBOX" && bash "$SCRIPT" --clean --yes 2>&1)
+RC_OLDYES=$?
+[[ $RC_OLDYES -ne 0 ]] && grep -q "Unknown arg: --yes" <<<"$OUT_OLDYES" \
+  && pass "bare --yes is rejected as an unknown arg" \
+  || fail "bare --yes is rejected as an unknown arg"
+
+OUT_RISKY=$(cd "$SANDBOX" && bash "$SCRIPT" --clean --risky 2>&1)
+WT_LIST_AFTER_RISKY=$(git -C "$REPO" worktree list --porcelain)
+! grep -q "projects/wt-risky-check" <<<"$WT_LIST_AFTER_RISKY" \
+  && pass "--risky unlocks RISKY-tier actions (worktree removed)" \
+  || fail "--risky unlocks RISKY-tier actions (worktree removed)"
+
+# ── Run 6: Task 2 — bare invocation and --dry-run behave identically ────────
+mk_wt wt-dryrun-check ".env"
+WT_LIST_BEFORE_DRYRUN=$(git -C "$REPO" worktree list --porcelain)
+OUT_BARE=$(cd "$SANDBOX" && bash "$SCRIPT" 2>&1)
+WT_LIST_AFTER_BARE=$(git -C "$REPO" worktree list --porcelain)
+OUT_DRYRUN=$(cd "$SANDBOX" && bash "$SCRIPT" --dry-run 2>&1)
+WT_LIST_AFTER_DRYRUN=$(git -C "$REPO" worktree list --porcelain)
+
+[[ "$WT_LIST_BEFORE_DRYRUN" == "$WT_LIST_AFTER_BARE" ]] \
+  && [[ "$WT_LIST_BEFORE_DRYRUN" == "$WT_LIST_AFTER_DRYRUN" ]] \
+  && [[ -f "$HOME_DIR/projects/wt-dryrun-check/.env" ]] \
+  && grep -q "Scan complete" <<<"$OUT_BARE" \
+  && grep -q "Scan complete" <<<"$OUT_DRYRUN" \
+  && pass "bare invocation and --dry-run behave identically (both mutate nothing)" \
+  || fail "bare invocation and --dry-run behave identically (both mutate nothing)"
 
 echo
 if [[ $FAIL -eq 0 ]]; then
