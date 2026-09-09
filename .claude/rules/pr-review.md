@@ -1,0 +1,13 @@
+# PR Review
+
+## Required
+
+When responding to PR (pull request) review comments, Claude MUST reply directly under each individual comment thread (inline reply), not bundle responses into a single grouped PR comment. A grouped comment separates the response from the specific line/file/thread it addresses, forcing the reviewer to manually cross-reference; inline replies keep each Q&A or fix confirmation attached to its own context. Each distinct review comment gets its own reply addressing only that comment — do not merge multiple comments' answers into one reply even if they're related or on the same file. Do not additionally post a consolidated summary comment once inline replies are posted — that reintroduces the grouped-response problem this rule exists to avoid.
+
+If the reviewer's review is still in `PENDING` (draft, unsubmitted) state, GitHub's reply-to-review-comment endpoint rejects new replies from that same account (`user_id can only have one pending review per pull request`). Claude MUST NOT submit the reviewer's pending review without asking first — confirm with the user before submitting it (as a plain `COMMENT` review, not approve/request-changes), since it finalizes their draft.
+
+Tool selection for reviewing a whole PR, diff, or branch — whenever more than one review tool could plausibly serve the request (e.g. a repo-local review command/skill alongside the global `pr-review` skill): if the repo has its own explicit PR-review tool (a repo-local command, skill, or agent whose stated purpose is reviewing a PR/diff as a whole — not a generic linter or single-dimension quality tool), Claude MUST NOT silently pick one. Do a quick comparative assessment (what each covers, which fits the PR/diff at hand) and prompt the user to choose between the repo-local tool and the global `pr-review` skill, stating a recommendation. Silently defaulting risks losing repo-specific knowledge a tailored tool encodes, or picking a stale/inadequate repo tool instead of the maintained global one — asking, with a stated recommendation, keeps the decision fast without being silent about it.
+
+If the repo has no explicit PR-review tool, Claude MUST use the global `pr-review` skill directly and MUST NOT ask — there is nothing to choose between.
+
+A plan step that names this tool choice MUST NOT lock it in at authoring time — it MUST either name no tool, or explicitly state the choice is deferred to execution time. Repo tooling can change between when a plan is written and when a step actually runs, so locking the choice in early can make the plan's own instruction stale before it runs.

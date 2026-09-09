@@ -21,7 +21,7 @@ So that rules are neither silently absent when they apply nor re-billed on every
 - **Complexity**: **XL** — split into 6 phases below; Phases 1-3 are the viable first increment
 - **Source PRD**: N/A (derived from `docs/rule-loading-audit.md`)
 - **PRD Phase**: N/A
-- **Estimated Files**: ~73 (49 imported verbatim in Task 1.3, 3 created, ~8 modified, ~12 deleted)
+- **Estimated Files**: ~74 (50 imported verbatim in Task 1.3, 3 created, ~8 modified, ~12 deleted)
 
 ---
 
@@ -191,11 +191,11 @@ deny() {
 
 **Task 1.3: Import current artifacts into the repo**
 - **ACTION**: Bring the user-wide files this plan will change into the repo with a **plain `cp`** — not `sync.sh` (wrong direction and it writes `~/.claude/`), not `/promote-artifact` (validates, syncs and opens git pipelines nobody asked for). Copy, reconcile duplicates, commit. That is the whole task.
-- **IMPLEMENT**: `rules/*.md` (all 24), `lazy/rules/**/*.md` (13), `hooks/*.py` + `*.sh` (the 10 live ones — **not** the 3 marked for deletion), `scripts/gh-branch-guard.sh` (1), `skills/pr-review/SKILL.md` (1, Task 3.3's fold target). 49 files. `skills/knowledge-ops/` is the other fold target but is already in the repo and identical — nothing to copy. Nothing else: the remaining skills, commands, agents, output styles and scripts are untouched by this plan and stay out (drift-check table below records why each category was considered and left).
+- **IMPLEMENT**: `rules/*.md` (all 24 top-level) + `rules/ecc/common/{git-workflow,hooks-todowrite-practices}.md` (the 2 `ecc/**` rules Tasks 3.1/3.3 change; the other 12 `ecc/**` rules are untouched and stay out), `lazy/rules/**/*.md` (13), `hooks/*` (the 9 registered in `settings.json` minus the 2 injectors retired in Phase 2 — an earlier "10" counted the unregistered `plans-index-guard.py`), `scripts/gh-branch-guard.sh` (1), `skills/pr-review/SKILL.md` (1, Task 3.3's fold target). 50 files. `skills/knowledge-ops/` is the other fold target but is already in the repo and identical — nothing to copy. Nothing else: the remaining skills, commands, agents, output styles and scripts are untouched by this plan and stay out (drift-check table below records why each category was considered and left).
 - **DUPLICATES**: for every file that already exists on both sides, decide per file — take the user-wide copy, keep the repo copy, or merge — and record the decision in the commit message. Checked 2026-09-09 with a byte-compare across `rules/`, `lazy/rules/`, `hooks/`, `scripts/`, `skills/`: exactly **two** in-scope collisions, `rules/web-research-tool-selection.md` and `skills/knowledge-ops/`, both byte-identical → keep the repo copy in both cases (the former is deleted in Phase 3 anyway). (`scripts/open-claude.sh` differs between sides but is out of scope — do not touch it.) If a later task needs a file not in this list, bring it in the same way, at that point, with the same duplicate check.
 - **GOTCHA**: parts of `~/.claude/rules/ecc/**` are **vendored** — an ECC reinstall overwrites them. Run `diff -r` against the ECC source before importing and record ours-vs-vendored per file in `docs/` (audit #K). **Vendored does not mean excluded**: track vendored files too, with a `vendored: ecc@<version>` marker in the manifest entry, so `sync.sh`'s three-way SHA detection reports an ECC overwrite as `[DIVERGED]` with the repo copy as merge base — instead of the overwrite silently reverting any `on:` frontmatter or customization. Same pattern as `tdd-workflow/SKILL.md`'s `customized: true` note, but enforced by sync rather than by prose.
 - **GOTCHA 2 — directory is not origin.** `ecc/common/hooks-todowrite-practices.md` lives in the ECC directory but is absent from every ECC cache version (user-owned, mtime 2026-08-24). Classify every `ecc/**` file by cache match, not path: the 213 skills/commands and 4 scripts below were checked that way; the `rules/ecc/**` and `lazy/rules/ecc/**` files were not until 2026-09-09, when the first one checked turned out to be misclassified. Re-run the check across all of them before importing.
-- **VALIDATE**: for each of the 49 files, `cmp .claude/<path> ~/.claude/<path>` exits 0 (or, for a merged duplicate, matches the recorded merge). No `sync.sh` run.
+- **VALIDATE**: for each of the 50 files, `cmp .claude/<path> ~/.claude/<path>` exits 0 (or, for a merged duplicate, matches the recorded merge). No `sync.sh` run.
 
 **Drift-check finding (2026-09-09), informing what this task leaves out:** re-running `sync.sh --dry-run`'s local-only scan found **256 files** running outside this repo's tracking entirely — not the 1 an earlier, narrower grep had suggested. Breakdown by category and confirmed origin:
 
@@ -380,8 +380,8 @@ EXPECT: ≤ 15,900 bytes (from 18,759; Cut bucket is 2,872 B after `context7.md`
 ---
 
 ## Acceptance Criteria
-- [ ] `manifest.yaml` + `sync.sh` manage `hooks` and `lazy`; `--dry-run` clean
-- [ ] Every user-wide file this plan changes (the 49 of Task 1.3, plus any brought in later the same way) is tracked in this repo before it is changed; nothing outside that set was imported
+- [x] `manifest.yaml` + `sync.sh` manage `hooks` and `lazy`; `--dry-run` clean — done 2026-09-09 (Tasks 1.1, 1.2)
+- [x] Every user-wide file this plan changes (the 50 of Task 1.3, plus any brought in later the same way) is tracked in this repo before it is changed; nothing outside that set was imported — done 2026-09-09
 - [ ] One `PreToolUse` injector replaces both old ones; both deleted (the four remaining one-off injectors are a separate, deferred decision — Task 6.3)
 - [ ] Injection fires **before** writes and dedupes per `(rule, subject)`
 - [ ] 40-edit trace costs ≈6,450 tok, not ≈86,000

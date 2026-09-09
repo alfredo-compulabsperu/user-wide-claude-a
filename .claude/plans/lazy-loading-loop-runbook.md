@@ -5,7 +5,7 @@
 **Mode**: fast (test gate at phase boundaries, not per task)
 **Model tier**: sonnet (default; override with `--model` if needed)
 **Stop condition**: every box in the plan's `## Acceptance Criteria` is `[x]`
-**Write target**: the repo only — `~/.claude/` is updated by `bash sync.sh --force`, never edited directly (plan § Architecture, *Execution principle*). Sole exception: `~/.claude/settings.json` (Task 2.3). Task 1.3 is the one reverse-direction step: a plain `cp` of the 49 files the plan changes, no `sync.sh`, no `/promote-artifact`, duplicates reconciled per file.
+**Write target**: the repo only — `~/.claude/` is updated by `bash sync.sh --force`, never edited directly (plan § Architecture, *Execution principle*). Sole exception: `~/.claude/settings.json` (Task 2.3). Task 1.3 is the one reverse-direction step: a plain `cp` of the 50 files the plan changes, no `sync.sh`, no `/promote-artifact`, duplicates reconciled per file.
 
 ## Pre-flight
 
@@ -32,7 +32,7 @@ Human-only. The loop MUST NOT start until every item is `[x]`.
 
 | # | Phase · Tasks | Kind | Gate | Status |
 |---|---|---|---|---|
-| 1 | Phase 1 · 1.1 → 1.3 | auto | `run-all.sh` green; `sync.sh --dry-run` exit 0 (1.1/1.2); all 49 imported files `cmp`-identical to `~/.claude/` (1.3) | pending |
+| 1 | Phase 1 · 1.1 → 1.3 | auto (ran in-session: worktree guard blocks nested `claude -p`) | `run-all.sh` green; `sync.sh --dry-run` exit 0 (1.1/1.2); all 50 imported files `cmp`-identical to `~/.claude/` (1.3) | done |
 | 2 | Phase 2 · 2.1 (RED) → 2.2 (GREEN) | auto, under `/tdd-workflow` | RED evidence then GREEN evidence, test file unchanged between | pending |
 | 3 | Phase 2 · 2.3 → 2.4 | **HUMAN** | fresh-session cutover check (plan § Manual Validation, first 3 boxes) | pending |
 | 4 | Phase 3 · 3.1, 3.2, 3.4 | auto | `run-all.sh` green; 3.2 read-check deferred to iteration 6's session | pending |
@@ -59,7 +59,7 @@ Each `claude -p` call must:
 command -v claude && python3 -c "import yaml" && python3 -m pytest --version && command -v jq && gh auth status
 
 # Iteration 1 — Phase 1
-claude -p "Read .claude/PRPs/plans/lazy-loading-system.plan.md. Execute Tasks 1.1, 1.2, 1.3 exactly as written, in order, writing only inside this worktree. Task 1.3 is a plain cp of exactly the 49 files it lists from ~/.claude/ into .claude/ — do NOT run sync.sh or /promote-artifact for it, and do NOT import anything outside that list. For any file that already exists on both sides, apply the DUPLICATES decision recorded in the task and note it in the commit message. Run each task's VALIDATE line and stop on the first failure. Finish with 'bash .claude/tests/run-all.sh'. Commit each task separately with a conventional message. Do not push."
+claude -p "Read .claude/PRPs/plans/lazy-loading-system.plan.md. Execute Tasks 1.1, 1.2, 1.3 exactly as written, in order, writing only inside this worktree. Task 1.3 is a plain cp of exactly the 50 files it lists from ~/.claude/ into .claude/ — do NOT run sync.sh or /promote-artifact for it, and do NOT import anything outside that list. For any file that already exists on both sides, apply the DUPLICATES decision recorded in the task and note it in the commit message. Run each task's VALIDATE line and stop on the first failure. Finish with 'bash .claude/tests/run-all.sh'. Commit each task separately with a conventional message. Do not push."
 
 # Gate 1
 bash .claude/tests/run-all.sh && bash sync.sh --dry-run   # dry-run is read-only: confirms 1.1/1.2 parse, not an install
