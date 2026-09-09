@@ -21,7 +21,7 @@ So that rules are neither silently absent when they apply nor re-billed on every
 - **Complexity**: **XL** — split into 6 phases below; Phases 1-3 are the viable first increment
 - **Source PRD**: N/A (derived from `docs/rule-loading-audit.md`)
 - **PRD Phase**: N/A
-- **Estimated Files**: ~72 (48 imported verbatim in Task 1.3, 3 created, ~8 modified, ~13 deleted)
+- **Estimated Files**: ~73 (49 imported verbatim in Task 1.3, 3 created, ~8 modified, ~12 deleted)
 
 ---
 
@@ -155,13 +155,15 @@ deny() {
 | `.claude/rules/*.md` | UPDATE | Promoted user-wide rules, reclassified |
 | `.claude/hooks/*.{py,sh}` | CREATE | The 10 live hooks imported verbatim (Task 1.3) |
 | `.claude/scripts/gh-branch-guard.sh` | CREATE | The one user-wide script the plan changes, imported verbatim (Task 1.3) ahead of its Task 5.1 move |
+| `.claude/skills/pr-review/SKILL.md` | CREATE then UPDATE | Imported verbatim (Task 1.3); Task 3.3 folds `pr-review.md` into it |
+| `.claude/skills/knowledge-ops/SKILL.md` | UPDATE | Already in the repo, byte-identical to `~/.claude/` (checked 2026-09-09); Task 3.3 folds `knowledge-ops-defaults.md` into it |
 | `~/.claude/settings.json` | UPDATE | Register the new hook; deregister the two retired injectors; add timeouts. **Only direct `~/.claude/` write in the plan** — no manifest section covers it |
 | `.claude/hooks/ecc-typescript-rule-inject.py` | DELETE | Superseded by M5 (+ `rm` the `~/.claude/` copy — sync never deletes) |
 | `.claude/hooks/confirm-before-test-changes-rule-inject.py` | DELETE | Superseded by M5 (+ `rm` the `~/.claude/` copy) |
 | `.claude/hooks/plans-index-guard.py` | DELETE | Registered nowhere (audit #11) (+ `rm` the `~/.claude/` copy) |
 | `.claude/hooks/hooks.json` | DELETE | 37 KB, 21 entries, dead (audit #12) (+ `rm` the `~/.claude/` copy) |
 | `.claude/hooks/README.md` | DELETE | Documents ~20 hooks that don't run (+ `rm` the `~/.claude/` copy) |
-| `.claude/rules/{pr-review,context7,knowledge-ops-defaults}.md` | DELETE | Redundant with skills/plugins (audit §3) (+ `rm` the `~/.claude/` copies) |
+| `.claude/rules/{pr-review,knowledge-ops-defaults}.md` | DELETE | Redundant with the skills they fold into (audit §3) (+ `rm` the `~/.claude/` copies). `context7.md` is **kept** — user decision 2026-09-09 |
 | `.claude/rules/web-research-tool-selection.md` | DELETE | Verbatim duplicate of the user-wide copy |
 | `.claude/scripts/gh-branch-guard.sh` | MOVE+UPDATE | → `.claude/hooks/`; fix `deny()`; sync installs the new path, then `rm` the old `~/.claude/scripts/` copy |
 | `.claude/hooks/check-settings-json-secrets.sh` | UPDATE | Remove `\|\| true`; fail closed on missing `jq` |
@@ -189,11 +191,11 @@ deny() {
 
 **Task 1.3: Import current artifacts into the repo**
 - **ACTION**: Bring the user-wide files this plan will change into the repo with a **plain `cp`** — not `sync.sh` (wrong direction and it writes `~/.claude/`), not `/promote-artifact` (validates, syncs and opens git pipelines nobody asked for). Copy, reconcile duplicates, commit. That is the whole task.
-- **IMPLEMENT**: `rules/*.md` (all 24), `lazy/rules/**/*.md` (13), `hooks/*.py` + `*.sh` (the 10 live ones — **not** the 3 marked for deletion), `scripts/gh-branch-guard.sh` (1). 48 files. Nothing else: skills, commands, agents, output styles and the other scripts are untouched by this plan and stay out (drift-check table below records why each category was considered and left).
-- **DUPLICATES**: for every file that already exists on both sides, decide per file — take the user-wide copy, keep the repo copy, or merge — and record the decision in the commit message. Checked 2026-09-09 with a byte-compare across `rules/`, `lazy/rules/`, `hooks/`, `scripts/`: exactly **one** in-scope collision, `rules/web-research-tool-selection.md`, and the two copies are identical → take either; the repo copy is deleted in Phase 3 anyway. (`scripts/open-claude.sh` differs between sides but is out of scope — do not touch it.) If a later task needs a file not in this list, bring it in the same way, at that point, with the same duplicate check.
+- **IMPLEMENT**: `rules/*.md` (all 24), `lazy/rules/**/*.md` (13), `hooks/*.py` + `*.sh` (the 10 live ones — **not** the 3 marked for deletion), `scripts/gh-branch-guard.sh` (1), `skills/pr-review/SKILL.md` (1, Task 3.3's fold target). 49 files. `skills/knowledge-ops/` is the other fold target but is already in the repo and identical — nothing to copy. Nothing else: the remaining skills, commands, agents, output styles and scripts are untouched by this plan and stay out (drift-check table below records why each category was considered and left).
+- **DUPLICATES**: for every file that already exists on both sides, decide per file — take the user-wide copy, keep the repo copy, or merge — and record the decision in the commit message. Checked 2026-09-09 with a byte-compare across `rules/`, `lazy/rules/`, `hooks/`, `scripts/`, `skills/`: exactly **two** in-scope collisions, `rules/web-research-tool-selection.md` and `skills/knowledge-ops/`, both byte-identical → keep the repo copy in both cases (the former is deleted in Phase 3 anyway). (`scripts/open-claude.sh` differs between sides but is out of scope — do not touch it.) If a later task needs a file not in this list, bring it in the same way, at that point, with the same duplicate check.
 - **GOTCHA**: parts of `~/.claude/rules/ecc/**` are **vendored** — an ECC reinstall overwrites them. Run `diff -r` against the ECC source before importing and record ours-vs-vendored per file in `docs/` (audit #K). **Vendored does not mean excluded**: track vendored files too, with a `vendored: ecc@<version>` marker in the manifest entry, so `sync.sh`'s three-way SHA detection reports an ECC overwrite as `[DIVERGED]` with the repo copy as merge base — instead of the overwrite silently reverting any `on:` frontmatter or customization. Same pattern as `tdd-workflow/SKILL.md`'s `customized: true` note, but enforced by sync rather than by prose.
 - **GOTCHA 2 — directory is not origin.** `ecc/common/hooks-todowrite-practices.md` lives in the ECC directory but is absent from every ECC cache version (user-owned, mtime 2026-08-24). Classify every `ecc/**` file by cache match, not path: the 213 skills/commands and 4 scripts below were checked that way; the `rules/ecc/**` and `lazy/rules/ecc/**` files were not until 2026-09-09, when the first one checked turned out to be misclassified. Re-run the check across all of them before importing.
-- **VALIDATE**: for each of the 48 files, `cmp .claude/<path> ~/.claude/<path>` exits 0 (or, for a merged duplicate, matches the recorded merge). No `sync.sh` run.
+- **VALIDATE**: for each of the 49 files, `cmp .claude/<path> ~/.claude/<path>` exits 0 (or, for a merged duplicate, matches the recorded merge). No `sync.sh` run.
 
 **Drift-check finding (2026-09-09), informing what this task leaves out:** re-running `sync.sh --dry-run`'s local-only scan found **256 files** running outside this repo's tracking entirely — not the 1 an earlier, narrower grep had suggested. Breakdown by category and confirmed origin:
 
@@ -265,10 +267,9 @@ deny() {
 - **VALIDATE**: Read a matching file; full rule text arrives with no "go read X" indirection. Afterwards `lazy/rules/` holds only hook-served bodies: `ask-before-test-changes`, `plan`, `research-ops`, `ecc/typescript/*` — no file there is referenced by a `paths:`-gated proxy.
 
 **Task 3.3: Delete redundant eager rules**
-- **ACTION**: Remove `pr-review.md`, `context7.md`, `knowledge-ops-defaults.md` and the duplicate repo `web-research-tool-selection.md`. **Not** the two eager `ecc/common/*` (reclassified 2026-09-09, audit §3 correction): `git-workflow.md` → M5 `on.commands` (`git commit`, `gh pr create`) in Task 3.1; `hooks-todowrite-practices.md` → keep eager, but first check whether `TodoWrite` still exists in the harness — it is absent from the current session's tool list, and if it is gone the rule is dead content and *then* gets deleted.
-- **SUB-CASES**: `pr-review` and `knowledge-ops-defaults` are *fold-then-delete* — content moves into the matching skill first, and the ECC plugin (which owns `knowledge-ops`) is currently disabled, so the fold target must be enabled to do it. `context7` is *delete-when-unblocked* (next GOTCHA).
-- **GOTCHA**: `context7.md` is only redundant *while* the context7 plugin is installed — and it failed to connect this session (`AUTH_HEADER_REJECTED`). Confirm the plugin is working before deleting the rule, or the guidance disappears entirely.
-- **VALIDATE**: Session-start eager load drops by ≥4,180 B (was 5,260 before the `ecc/common/*` reclassification). Measure with the audit §3 byte script.
+- **ACTION**: Remove `pr-review.md`, `knowledge-ops-defaults.md` and the duplicate repo `web-research-tool-selection.md`. **Not** `context7.md` (kept — user decision 2026-09-09, so the plugin's auth state no longer matters here). **Not** the two eager `ecc/common/*` (reclassified 2026-09-09, audit §3 correction): `git-workflow.md` → M5 `on.commands` (`git commit`, `gh pr create`) in Task 3.1; `hooks-todowrite-practices.md` → keep eager, but first check whether `TodoWrite` still exists in the harness — it is absent from the current session's tool list, and if it is gone the rule is dead content and *then* gets deleted.
+- **SUB-CASES**: `pr-review` and `knowledge-ops-defaults` are *fold-then-delete* — content moves into the matching skill first. Both fold targets are local files we own (`~/.claude/skills/{pr-review,knowledge-ops}/SKILL.md`; `knowledge-ops` carries `origin: ECC` metadata but has no ECC cache copy — once installed it is ours), both are in the repo after Task 1.3, so no plugin needs enabling.
+- **VALIDATE**: Session-start eager load drops by ≥2,872 B (`pr-review.md` 2,629 + `knowledge-ops-defaults.md` 243; was 4,180 before `context7.md` was kept, 5,260 before the `ecc/common/*` reclassification). Measure with the audit §3 byte script.
 
 **Task 3.4: Fix the dangling ECC links**
 - **ACTION**: Repair the first line of all 5 `lazy/rules/ecc/typescript/*.md`.
@@ -367,7 +368,7 @@ EXPECT: JSON with `additionalContext` on first run, empty on second
 cd ~/.claude/rules && e=0; for f in *.md ecc/common/*.md; do \
   sed -n '1,10p' "$f" | grep -q '^paths:' || e=$((e+$(wc -c < "$f"))); done; echo "$e"
 ```
-EXPECT: ≤ 14,600 bytes (from 18,759; Cut bucket is 4,180 B after the `ecc/common/*` reclassification — the M5 bucket's 6,328 B stops loading eagerly only once Phase 2 is live and those rules leave the eager path)
+EXPECT: ≤ 15,900 bytes (from 18,759; Cut bucket is 2,872 B after `context7.md` was kept and the `ecc/common/*` reclassification — the M5 bucket's 6,328 B stops loading eagerly only once Phase 2 is live and those rules leave the eager path)
 
 ### Manual Validation
 - [ ] Fresh session: edit a `.ts` file → rule text appears **before** the write lands
@@ -380,11 +381,11 @@ EXPECT: ≤ 14,600 bytes (from 18,759; Cut bucket is 4,180 B after the `ecc/comm
 
 ## Acceptance Criteria
 - [ ] `manifest.yaml` + `sync.sh` manage `hooks` and `lazy`; `--dry-run` clean
-- [ ] Every user-wide file this plan changes (the 48 of Task 1.3, plus any brought in later the same way) is tracked in this repo before it is changed; nothing outside that set was imported
+- [ ] Every user-wide file this plan changes (the 49 of Task 1.3, plus any brought in later the same way) is tracked in this repo before it is changed; nothing outside that set was imported
 - [ ] One `PreToolUse` injector replaces both old ones; both deleted (the four remaining one-off injectors are a separate, deferred decision — Task 6.3)
 - [ ] Injection fires **before** writes and dedupes per `(rule, subject)`
 - [ ] 40-edit trace costs ≈6,450 tok, not ≈86,000
-- [ ] Eager session load reduced by ≥4,180 B from cuts alone, ≥10,508 B once M5 carries the write- and command-triggered rules
+- [ ] Eager session load reduced by ≥2,872 B from cuts alone, ≥9,200 B once M5 carries the write- and command-triggered rules
 - [ ] `gh-branch-guard.sh` can actually deny
 - [ ] Secret scanner fails closed
 - [ ] Hook test suite exists and passes, with RED evidence recorded from before the injector existed (Task 2.1) and GREEN evidence from the unmodified same tests after (Task 2.2)
@@ -399,7 +400,6 @@ EXPECT: ≤ 14,600 bytes (from 18,759; Cut bucket is 4,180 B after the `ecc/comm
 | ECC reinstall reverts vendored `rules/ecc/**` | **High** | Medium | Record ours-vs-vendored in `docs/` (Task 1.3); prefer editing only files we own |
 | Session-id payload key differs from assumption | Medium | High — dedup silently degrades to per-process | Log one live payload before coding (Task 2.2 Gotcha 2) |
 | `PreToolUse` injector adds latency to every edit | Medium | Medium | Frontmatter split, not a YAML parse; no network/subprocess; measure before/after |
-| Deleting `context7.md` while the plugin is broken | Medium | Low | Plugin currently fails `AUTH_HEADER_REJECTED` — verify before deleting (Task 3.3) |
 | Cutover leaves a window with no test-change guard | Low | Medium | Register M5 **before** deleting the old injectors; both merge safely |
 | `hook-path-convention` cause is a harness bug | Medium | Low | Time-box Phase 4; document and move on rather than chasing |
 
