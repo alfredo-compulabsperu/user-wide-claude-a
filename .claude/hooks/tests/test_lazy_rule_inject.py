@@ -140,6 +140,47 @@ def test_rule_dirs_env_expands_variables(tmp_path, monkeypatch):
     assert "TS BODY" in context_of(r)
 
 
+# ── Edge cases (plan § Edge Cases Checklist) ─────────────────────────────────
+
+def test_subject_with_spaces_and_non_ascii(tmp_path):
+    write_rule(tmp_path / "rules", "ts.md", TS_RULE)
+    path = "/w/my dir/señal ✓.ts"
+    assert "TS BODY" in context_of(run_hook(tmp_path, write_payload(path)))
+    assert run_hook(tmp_path, write_payload(path)).stdout.strip() == ""  # dedup keyed on the same bytes
+
+
+def test_unwritable_marker_dir_fires_anyway_and_warns(tmp_path):
+    write_rule(tmp_path / "rules", "ts.md", TS_RULE)
+    markers = tmp_path / "markers"
+    markers.mkdir()
+    markers.chmod(0o500)
+    try:
+        r1 = run_hook(tmp_path, write_payload("/w/a.ts"))
+        r2 = run_hook(tmp_path, write_payload("/w/a.ts"))
+    finally:
+        markers.chmod(0o700)
+    assert "TS BODY" in context_of(r1) and "TS BODY" in context_of(r2)  # no dedup, but never dropped
+    assert "unwritable" in r1.stderr
+
+
+def test_concurrent_hooks_on_same_subject_exactly_one_fires(tmp_path):
+    write_rule(tmp_path / "rules", "ts.md", TS_RULE)
+    env = {
+        **os.environ,
+        "LAZY_RULE_INJECT_RULE_DIRS": str(tmp_path / "rules"),
+        "LAZY_RULE_INJECT_MARKER_DIR": str(tmp_path / "markers"),
+    }
+    data = json.dumps(write_payload("/w/a.ts"))
+    procs = [
+        subprocess.Popen([sys.executable, str(HOOK)], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+        for _ in range(16)
+    ]
+    outs = [p.communicate(data, timeout=10)[0] for p in procs]
+    assert all(p.returncode == 0 for p in procs)
+    assert sum(1 for o in outs if o.strip()) == 1
+
+
 # ── Failure modes: never block the tool, never fail silently ─────────────────
 
 def test_malformed_payload_exits_zero_and_warns(tmp_path):

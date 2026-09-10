@@ -327,12 +327,12 @@ deny() {
 | Fork propagation | subagent edits `x.ts` | rule loads (hooks reach subagents) | **yes** |
 
 ### Edge Cases Checklist
-- [ ] Empty `file_path` in payload
-- [ ] Subject path containing spaces / non-ASCII
-- [ ] Two rules matching the same subject → **both** must fire (§4-A: rules don't compete)
-- [ ] Marker dir unwritable (read-only `tmpdir`) → fire anyway, warn
-- [ ] Concurrent hook processes on the same subject → `O_EXCL` makes exactly one win
-- [ ] Rule file with malformed frontmatter → skip that rule, warn, continue others
+- [x] Empty `file_path` in payload — `test_empty_file_path_is_silent`
+- [x] Subject path containing spaces / non-ASCII — `test_subject_with_spaces_and_non_ascii`
+- [x] Two rules matching the same subject → **both** must fire (§4-A: rules don't compete) — `test_two_rules_matching_same_subject_both_fire`
+- [x] Marker dir unwritable (read-only `tmpdir`) → fire anyway, warn — `test_unwritable_marker_dir_fires_anyway_and_warns`
+- [x] Concurrent hook processes on the same subject → `O_EXCL` makes exactly one win — `test_concurrent_hooks_on_same_subject_exactly_one_fires` (16 parallel processes, one output)
+- [x] Rule file with malformed frontmatter → skip that rule, warn, continue others — `test_malformed_frontmatter_skips_that_rule_and_continues`
 
 ---
 
@@ -371,11 +371,11 @@ cd ~/.claude/rules && e=0; for f in *.md ecc/common/*.md; do \
 EXPECT: ≤ 15,900 bytes (from 18,759; Cut bucket is 2,872 B after `context7.md` was kept and the `ecc/common/*` reclassification — the M5 bucket's 6,328 B stops loading eagerly only once Phase 2 is live and those rules leave the eager path)
 
 ### Manual Validation
-- [ ] Fresh session: edit a `.ts` file → rule text appears **before** the write lands
-- [ ] Same session, edit it again → no re-injection
-- [ ] Same session, edit a different `.ts` → injection fires again
+- [x] Fresh session: edit a `.ts` file → rule text appears **before** the write lands — 2026-09-09 in-session (`PreToolUse` label, body arrived before the Write result) and in a subagent; 2026-09-10: 28 distinct session ids hold dedup markers in `/tmp`, i.e. the hook has served that many fresh sessions on this machine. Not repeated in a hand-started top-level session
+- [x] Same session, edit it again → no re-injection — `probe.ts` rewrite silent (session), `probe3.ts` rewrite silent (subagent)
+- [x] Same session, edit a different `.ts` → injection fires again — `probe2.ts` / `probe4.ts` fired
 - [x] Spawn a subagent that edits a `.ts` → rule loads there too — 2026-09-09: general-purpose subagent wrote `probe3.ts`, rewrote it, wrote `probe4.ts`; injected on writes 1 and 3 (7 bodies), silent on 2
-- [ ] `/hooks` lists the new hook and none of the deleted ones
+- [x] `/hooks` lists the new hook and none of the deleted ones — verified on the file `/hooks` renders: `~/.claude/settings.json` has 10 entries, `lazy-rule-inject.py` present, `ecc-typescript-rule-inject.py` / `confirm-before-test-changes-rule-inject.py` absent (2026-09-09)
 
 ---
 
@@ -384,7 +384,7 @@ EXPECT: ≤ 15,900 bytes (from 18,759; Cut bucket is 2,872 B after `context7.md`
 - [x] Every user-wide file this plan changes (the 50 of Task 1.3, plus any brought in later the same way) is tracked in this repo before it is changed; nothing outside that set was imported — done 2026-09-09
 - [x] One `PreToolUse` injector replaces both old ones; both deleted (the four remaining one-off injectors are a separate, deferred decision — Task 6.3) — done 2026-09-09 (Tasks 2.3, 2.4)
 - [x] Injection fires **before** writes and dedupes per `(rule, subject)` — verified live 2026-09-09: `.claude/tdd/lazy-loading-system.tdd.md` § Coverage
-- [ ] 40-edit trace costs ≈6,450 tok, not ≈86,000
+- [x] 40-edit trace costs ≈6,450 tok, not ≈86,000 — measured 2026-09-10 by replaying 40 Write payloads over 3 `.ts` files through the real injector and real `~/.claude` rules: 3 fires, **29,022 B ≈ 7,255 tok** vs ≈96,740 tok without dedup (13×). Per-fire size is 9,674 B, not the plan's 8,575 B, because `coding-principles` now also fires on `.ts` (Task 3.2)
 - [x] Eager session load reduced by ≥2,872 B from cuts alone, ≥9,200 B once M5 carries the write- and command-triggered rules — measured 2026-09-09 with the audit byte script on `~/.claude`: 18,759 → 9,962 after Tasks 3.1/3.2 → **6,765 B** after Task 3.3 (−11,994 B, 64%)
 - [x] `gh-branch-guard.sh` can actually deny — 2026-09-09: `deny()` emits `hookSpecificOutput.permissionDecision: deny` via `jq -n`; moved to `.claude/hooks/`; piped `gh pr create --base main` payload → deny JSON, `--base develop` → silent (Task 5.1)
 - [x] Secret scanner fails closed — 2026-09-09: missing/failing `jq` → `exit 2` with a BLOCKED line; shadowed-`jq` run denied a benign `settings.json` write, real `jq` still denies `ghp_…` and allows benign content (Task 5.2)
