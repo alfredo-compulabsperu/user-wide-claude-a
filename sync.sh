@@ -8,7 +8,9 @@ MANIFEST="$REPO_DIR/manifest.yaml"
 DRY_RUN=0
 FORCE=0
 FORCE_DIVERGED=0
+ALLOW_BRANCH=0
 SUBCOMMAND="install"
+ALLOWED_BRANCHES=(develop main master)
 
 CNT_OK=0
 CNT_UPDATED=0
@@ -29,7 +31,16 @@ Options:
   -f, --force           Overwrite existing files even when SHA-256 differs (no prompt)
   -D, --force-diverged  Also overwrite destinations edited out-of-band since last sync
                         (plain --force never does this — see [DIVERGED] below)
+  -B, --allow-branch    Allow a real (non-dry-run) sync from a branch other than
+                        develop/main/master (default: refuse — see [BRANCH GUARD] below)
   -h, --help            Show this help
+
+[BRANCH GUARD]
+sync.sh copies whatever is checked out in THIS working tree into the shared
+~/.claude/ — running it from a feature/worktree branch pushes that branch's
+content, not develop's. A real (write) run off a non-develop/main/master
+branch is refused unless --allow-branch is passed. --dry-run is always
+exempt (it never writes anything).
 
 EOF
   exit 0
@@ -41,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     -n|--dry-run)        DRY_RUN=1 ;;
     -f|--force)          FORCE=1 ;;
     -D|--force-diverged) FORCE_DIVERGED=1 ;;
+    -B|--allow-branch)   ALLOW_BRANCH=1 ;;
     -h|--help)           usage ;;
     install)              SUBCOMMAND="install" ;;
     *)                    echo "ERROR: unknown argument: $1" >&2; exit 1 ;;
@@ -54,6 +66,28 @@ command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 required for YAML p
 [[ -d "$CLAUDE_DIR" ]] || { echo "ERROR: $CLAUDE_DIR does not exist" >&2; exit 1; }
 SYNC_STATE_SCRIPT="$REPO_DIR/.claude/scripts/sync-state.sh"
 [[ -f "$SYNC_STATE_SCRIPT" ]] || { echo "ERROR: sync-state.sh not found at $SYNC_STATE_SCRIPT" >&2; exit 1; }
+
+# --- branch guard: refuse a real (write) run off a non-canonical branch ---
+# $REPO_DIR not being a git repo at all (e.g. a scratch test sandbox) is left
+# unguarded — the guard concerns which branch, not whether git is present.
+if [[ $DRY_RUN -eq 0 ]]; then
+  CURRENT_BRANCH="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  if [[ -n "$CURRENT_BRANCH" ]]; then
+    branch_allowed=0
+    for b in "${ALLOWED_BRANCHES[@]}"; do
+      [[ "$CURRENT_BRANCH" == "$b" ]] && { branch_allowed=1; break; }
+    done
+    if [[ $branch_allowed -eq 0 ]]; then
+      if [[ $ALLOW_BRANCH -eq 1 ]]; then
+        echo "WARN: syncing from branch '$CURRENT_BRANCH' (--allow-branch override)" >&2
+      else
+        echo "ERROR: refusing to sync from branch '$CURRENT_BRANCH' — sync.sh pushes THIS checkout into the shared ~/.claude/, and this isn't develop/main/master." >&2
+        echo "       Switch to develop, or pass --allow-branch to sync from here on purpose (e.g. an unmerged fix)." >&2
+        exit 1
+      fi
+    fi
+  fi
+fi
 
 # Stored as array so multi-word commands work safely with xargs -0 (C2)
 SHA256_CMD=()

@@ -100,6 +100,19 @@ get_baseline() {
   HOME="$SANDBOX_HOME" bash "$SCRATCH_REPO/.claude/scripts/sync-state.sh" get "$1"
 }
 
+# git_init_branch <branch>: makes $SCRATCH_REPO an actual git repo checked
+# out on <branch>, for exercising the branch guard (setup_sandbox alone
+# leaves it a plain non-git directory, which the guard intentionally ignores).
+# An initial commit is required: on an unborn branch (zero commits), `git
+# rev-parse --abbrev-ref HEAD` prints the literal string "HEAD" to stdout
+# while still failing — a real repo always has commits, so this only bites
+# a freshly-`init`ed sandbox.
+git_init_branch() {
+  git -C "$SCRATCH_REPO" init -q -b "$1"
+  git -C "$SCRATCH_REPO" -c user.email=test@test -c user.name=test \
+    commit -q --allow-empty -m init
+}
+
 sha256_of() {
   sha256sum "$1" | cut -c1-64
 }
@@ -262,6 +275,70 @@ if [[ "$(cat "$dest/SKILL.md")" == "$(cat "$src/SKILL.md")" ]] && grep -q '\[UPD
 else
   echo "$out"
   run_test "diverged dir: --force-diverged overwrites" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 11: branch guard — refuses a real sync from a feature branch
+# ---------------------------------------------------------------------------
+setup_sandbox script
+git_init_branch "worktree-some-feature"
+dest="$SANDBOX_HOME/.claude/scripts/myscript.sh"
+out="$(run_sync '' 2>&1)" && rc=0 || rc=$?
+if [[ $rc -ne 0 ]] && grep -q 'refusing to sync' <<< "$out" && [[ ! -f "$dest" ]]; then
+  run_test "branch guard: refuses real sync from a feature branch" "pass"
+else
+  echo "  rc=$rc"
+  echo "$out"
+  run_test "branch guard: refuses real sync from a feature branch" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 12: branch guard — allows a real sync from develop
+# ---------------------------------------------------------------------------
+setup_sandbox script
+git_init_branch "develop"
+src="$SCRATCH_REPO/.claude/scripts/myscript.sh"
+dest="$SANDBOX_HOME/.claude/scripts/myscript.sh"
+out="$(run_sync '')" || true
+if [[ -f "$dest" ]] && [[ "$(cat "$dest")" == "$(cat "$src")" ]]; then
+  run_test "branch guard: allows real sync from develop" "pass"
+else
+  echo "$out"
+  run_test "branch guard: allows real sync from develop" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 13: branch guard — --allow-branch overrides the refusal
+# ---------------------------------------------------------------------------
+setup_sandbox script
+git_init_branch "worktree-some-feature"
+src="$SCRATCH_REPO/.claude/scripts/myscript.sh"
+dest="$SANDBOX_HOME/.claude/scripts/myscript.sh"
+out="$(run_sync '' --allow-branch 2>&1)" || true
+if [[ -f "$dest" ]] && [[ "$(cat "$dest")" == "$(cat "$src")" ]] && grep -q 'allow-branch override' <<< "$out"; then
+  run_test "branch guard: --allow-branch overrides refusal" "pass"
+else
+  echo "$out"
+  run_test "branch guard: --allow-branch overrides refusal" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 14: branch guard — --dry-run is exempt on a feature branch
+# ---------------------------------------------------------------------------
+setup_sandbox script
+git_init_branch "worktree-some-feature"
+dest="$SANDBOX_HOME/.claude/scripts/myscript.sh"
+out="$(run_sync '' --dry-run)" && rc=0 || rc=$?
+if [[ $rc -eq 0 ]] && ! grep -q 'refusing to sync' <<< "$out" && [[ ! -f "$dest" ]]; then
+  run_test "branch guard: --dry-run exempt from guard on a feature branch" "pass"
+else
+  echo "  rc=$rc"
+  echo "$out"
+  run_test "branch guard: --dry-run exempt from guard on a feature branch" "fail"
 fi
 cleanup_sandbox
 
