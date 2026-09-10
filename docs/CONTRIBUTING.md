@@ -29,35 +29,54 @@ For full flag reference: `bash sync.sh --help`
 |---------|-------------|
 | `bash sync.sh` | Install all artifacts from repo to `~/.claude/` |
 | `bash sync.sh --dry-run` | Report missing/stale/local-only artifacts without modifying `~/.claude/` |
-| `bash sync.sh --force` | Overwrite existing files even when SHA-256 differs (no prompt) |
+| `bash sync.sh --force` | Overwrite existing files even when SHA-256 differs (no prompt); never touches `[DIVERGED]` |
+| `bash sync.sh --force-diverged` | Also overwrite destinations edited out-of-band since the last sync |
+| `bash .claude/tests/run-all.sh` | Run every bash test suite under `.claude/tests/scripts/` |
+| `python3 -m pytest .claude/hooks/tests/` | Run the hook tests (`lazy-rule-inject.py`) |
 <!-- END AUTO-GENERATED -->
 
 ## Slash Commands
 
-<!-- AUTO-GENERATED: from commands/ and skills/ -->
+<!-- AUTO-GENERATED: from the description: frontmatter of .claude/commands/*.md and .claude/skills/*/SKILL.md -->
 | Trigger | Description |
 |---------|-------------|
-| `/vm-health` | Run VM health checks (disk, CPU, memory); prints verbatim output from `vm-health.sh` |
-| `/validate-artifact <path>` | Validate an artifact for portability, dependency completeness, and terseness |
-| `/promote-artifact <path> [--type] [--force] [--git]` | Validate and install artifact locally and into the repo; `--git` runs full PR pipeline |
+| `/open-claude` | Open a new Claude Code session, in a named tmux window when inside tmux |
+| `/open-gh-issue` | Output GitHub issue URLs by ID(s) or natural-language search |
+| `/open-gh-pr` | Output GitHub pull request URLs by ID(s) |
+| `/rename-tmux-window [name]` | Rename the current tmux window; defaults to branch/worktree name |
+| `/session-summary` | Plain-English summary of the current session (default/`--extra`/`--full`) |
+| `/vm-cleanup` | Scan and clean dev VM disk consumers (apt, journald, npm, node_modules, worktrees, Trash, snap, nvm) |
+| `/vm-health` | Report VM resource health, spot issues, recommend optimizations |
+| `/catalog` | Summarize every artifact declared in `manifest.yaml`, grouped by type |
+| `/copy-plugin-tool --plugin <hint> --tools <hint>` | Copy one agent/command/skill out of an installed plugin's cache into `.claude/` |
+| `/execute-plan <plan>` | Drive a saved plan end-to-end to a reviewed PR via isolated per-task agents |
+| `/gh-issue-create` | Create a GitHub issue with template enforcement and dual-agent draft review |
+| `/gh-pr-update` | Rewrite the current branch's PR title and body to match what was actually changed |
+| `/knowledge-ops` | Knowledge base management, ingestion, sync and retrieval across storage layers |
+| `/pr-review [--comment]` | Review a PR or diff by domain, deferring to the repo's own domain owners |
+| `/promote-artifact <path> [--type] [--force] [--git]` | Validate and install an artifact locally and into the repo; `--git` runs the PR pipeline |
+| `/research-ops` | Evidence-first current-state research workflow |
+| `/run-prd <prd>` | Drive a whole PRD to a reviewed PR, one plan per pending milestone |
+| `/ship` | Commit → push → PR create/update → optional review → merge → delete branch, one shot |
+| `/validate-artifact <path>` | Validate an artifact for portability, dependency completeness, terseness and coherence |
 <!-- END AUTO-GENERATED -->
 
 ## Testing
 
-No automated test suite. Validation steps:
-
 ```bash
-python3 -c "import yaml; yaml.safe_load(open('manifest.yaml')); print('manifest: OK')"
-bash -n sync.sh && echo "sync.sh: OK"
-ls .claude/skills/validate-artifact/SKILL.md && echo "validate-artifact: OK"
-ls .claude/skills/promote-artifact/SKILL.md && echo "promote-artifact: OK"
+bash .claude/tests/run-all.sh              # bash suites, one per script under .claude/tests/scripts/
+python3 -m pytest .claude/hooks/tests/ -q  # hook tests; black-box, drive the hook via stdin JSON
+bash sync.sh --dry-run                     # must exit 0; read-only
 ```
+
+Bash suites are plain scripts printing `PASS:`/`FAIL:` lines; add `.claude/tests/scripts/<name>.test.sh` for a new script and `run-all.sh` picks it up. Hook tests point the hook at per-test tmp dirs through `LAZY_RULE_INJECT_RULE_DIRS` / `LAZY_RULE_INJECT_MARKER_DIR` and never touch `~/.claude`.
 
 ## Adding a New Artifact
 
-1. Place the artifact under the correct directory (`.claude/skills/`, `.claude/commands/`, `.claude/agents/`, `.claude/scripts/`).
-2. Run `/promote-artifact <path>` (or `/promote-artifact <path> --git` to open a PR).
-3. The skill updates `manifest.yaml` automatically.
+1. Place the artifact under the correct directory (`.claude/skills/`, `.claude/commands/`, `.claude/agents/`, `.claude/scripts/`, `.claude/rules/`, `.claude/hooks/`, `.claude/lazy/rules/`).
+2. Skills, commands, agents, scripts: run `/promote-artifact <path>` (or `--git` to open a PR); it updates `manifest.yaml`.
+3. Rules, hooks, lazy bodies: add the manifest entry by hand (`hooks` need `executable: true`), then `bash sync.sh`. For a hook, sync **before** registering it in `~/.claude/settings.json` — see `docs/RUNBOOK.md` § Hooks and Lazy Rules.
+4. A lazy rule needs an `on:` block (`tools`, and `paths` and/or `commands` globs); test it in this repo by writing a matching file — the repo's `.claude/settings.json` serves rules from the repo copies.
 
 ## Code Style
 

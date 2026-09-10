@@ -38,8 +38,10 @@ via `manifest.yaml` like any other.
 
 ## Manifest Sections
 
-`skills`, `commands`, `agents`, `scripts`, `output_styles`, `plugins`, `claude_md` → maps 1:1 to
-`~/.claude/` subdirectories. Adding an entry without the file causes `[MISSING]` in dry-run.
+`skills`, `commands`, `agents`, `rules`, `hooks`, `lazy`, `scripts`, `output_styles`, `plugins`,
+`claude_md` → maps 1:1 to `~/.claude/` subdirectories (`lazy` entries are paths under `~/.claude/lazy/`,
+e.g. `rules/plan.md`). Adding an entry without the file causes `[MISSING]` in dry-run. `hooks` and
+`scripts` entries take `executable: true`; `vendored: ecc` on a rule is documentation only.
 
 ## Gotchas
 
