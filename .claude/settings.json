@@ -1,6 +1,6 @@
 {
   "enabledPlugins": {
-    "ecc@ecc": true,
+    "ecc@ecc": false,
     "claude-md-management@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
     "github@claude-plugins-official": true,
