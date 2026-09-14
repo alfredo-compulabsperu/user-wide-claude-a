@@ -84,6 +84,7 @@ _confirm() {
 }
 
 _skip() { printf "  ${R}[SKIP]${N}    %s\n" "$1"; }
+_review() { printf "  ${Y}[REVIEW]${N}  %s\n" "$1"; }
 
 # Single source of truth for the protected-name predicates; used by both the
 # detection probe and the rescue pass so they can never disagree on depth or
@@ -362,6 +363,66 @@ if [[ -d "$NVM_DIR" ]]; then
 else
   echo "  nvm not found"
 fi
+
+# ── 12. dangling Claude Code processes (report only — never killed) ──────────
+_section "Dangling Claude Code processes (report only, never killed)"
+
+REVIEW_PROC_PATTERN='^(claude|bun|node)$'
+
+if [[ -n "${VMCLEANUP_PROCESSES_FILE:-}" ]]; then
+  PS_SNAP=$(cat "$VMCLEANUP_PROCESSES_FILE" 2>/dev/null)
+else
+  PS_SNAP=$(ps -eo pid,ppid,comm,tty --no-headers 2>/dev/null)
+fi
+
+_ppid_of() { awk -v p="$1" '$1==p{print $2; exit}' <<< "$PS_SNAP"; }
+_comm_of() { awk -v p="$1" '$1==p{print $3; exit}' <<< "$PS_SNAP"; }
+
+# This script's own process tree is never a candidate, however far its chain
+# runs -- otherwise a live Claude Code session invoking this scan would flag
+# its own currently-in-use MCP servers as "dangling".
+declare -A SELF_CHAIN
+_self_walk=$$
+_self_guard=0
+while [[ -n "$_self_walk" ]]; do
+  SELF_CHAIN["$_self_walk"]=1
+  (( _self_guard++ > 200 )) && break
+  [[ "$_self_walk" == "1" ]] && break
+  _self_walk=$(_ppid_of "$_self_walk")
+done
+
+# _has_live_claude_ancestor <ppid> -- true when walking up from <ppid> ever
+# reaches a live `claude` process, or this script's own process tree. A
+# fork-subagent (comm=claude, tty=?, parent is a live claude) is caught here
+# and never flagged; only a chain with NO living claude anywhere above it,
+# and not part of the invoking session, is reported below.
+_has_live_claude_ancestor() {
+  local cur="$1" guard=0
+  while [[ -n "$cur" && "$cur" != "1" ]]; do
+    (( guard++ > 200 )) && break
+    [[ -n "${SELF_CHAIN[$cur]:-}" ]] && return 0
+    [[ "$(_comm_of "$cur")" == "claude" ]] && return 0
+    cur=$(_ppid_of "$cur")
+  done
+  return 1
+}
+
+FOUND_ORPHAN=false
+while read -r pid ppid comm tty; do
+  [[ "$comm" =~ $REVIEW_PROC_PATTERN ]] || continue
+  [[ -n "${SELF_CHAIN[$pid]:-}" ]] && continue
+  _has_live_claude_ancestor "$ppid" && continue
+
+  if [[ "$tty" == "?" || -z "$tty" ]]; then
+    NOTE="likely leaked -- no controlling terminal"
+  else
+    NOTE="has a terminal (${tty}) -- verify it isn't an intentionally backgrounded job"
+  fi
+  _review "pid=${pid} ppid=${ppid} comm=${comm} tty=${tty} -- ${NOTE}. Inspect: ps -fp ${pid}. If confirmed unwanted: kill -TERM ${pid}"
+  FOUND_ORPHAN=true
+done <<< "$PS_SNAP"
+
+$FOUND_ORPHAN || echo "  none found"
 
 # ── summary ───────────────────────────────────────────────────────────────────
 _section "Summary"

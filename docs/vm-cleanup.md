@@ -3,7 +3,8 @@
 Scans and cleans common dev-VM disk consumers: apt cache, journald logs, npm
 cache, `~/.cache` subdirs, snap disabled revisions, the Firebase emulator
 cache, Trash, `node_modules`, stale git worktrees, and old `nvm` node
-versions.
+versions. Also reports (never kills) dangling Claude Code processes — see
+[Dangling process detection](#dangling-process-detection).
 
 ## Usage
 
@@ -43,6 +44,39 @@ these hold:
 - its git status can't be read
 - it has no upstream tracking branch
 - it's ahead of its upstream (unpushed commits)
+
+## Dangling process detection
+
+Every run (scan or `--clean`) also scans the process table for `claude`,
+`bun`, and `node` processes with no live `claude` ancestor — leftovers from a
+crashed or killed Claude Code session (its MCP server subprocesses reparent
+to init or a subreaper like tmux instead of exiting). These are reported
+under `[REVIEW]` with the suspect PID, its parent PID, and a suggested
+inspect/kill command. **They are never killed automatically, under any flag
+combination** — the script only ever reports them.
+
+Detection walks each candidate's parent-PID chain looking for a live `claude`
+process; a chain that never finds one is flagged. This deliberately does not
+rely on `ppid == 1`, because a subreaper (tmux, `systemd --user`) can
+reparent an orphan to itself rather than to init. A fork-subagent — a
+`claude` process with `tty=?` whose direct parent is another live `claude`
+process — has a live ancestor and is never flagged, regardless of its `tty`.
+
+`claude` processes themselves are only ever reported, never a kill
+candidate under any tier: a background/headless `claude` run legitimately
+looks identical to a dead one from the process table alone, and killing a
+live one destroys in-progress agent work with no rescue path (unlike the
+file deletions above, which are rescued to `~/.claude/cleanup-rescue/`).
+
+The report annotates each finding for manual judgment, but doesn't act on
+it:
+- **No controlling terminal** (`tty=?`) — likely leaked; safest to inspect
+  first (`ps -fp <pid>`), then `kill -TERM <pid>` if confirmed unwanted.
+- **Has a terminal** — may be an intentionally backgrounded/disowned job;
+  verify before killing.
+
+This script's own process tree (and its invoking Claude Code session, if
+any) is never reported, however far its ancestor chain runs.
 
 ## Exit codes
 

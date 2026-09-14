@@ -283,6 +283,56 @@ RC_FAILINJECT=$?
   && pass "a failing SAFE action causes non-zero exit and appears in the Summary" \
   || fail "a failing SAFE action causes non-zero exit and appears in the Summary"
 
+# ── Run 10: section 12 — dangling process detection (synthetic ps table) ────
+# A real system's own process tree can't be safely fuzzed in a test, so this
+# feeds a synthetic "pid ppid comm tty" table via VMCLEANUP_PROCESSES_FILE
+# instead of letting the script call the real `ps`.
+FAKE_PS="$SANDBOX/fake-ps.txt"
+cat > "$FAKE_PS" <<'EOF'
+90001 1 bun ?
+90002 90003 bun ?
+90003 1 claude pts/9
+90004 90005 claude ?
+90005 1 claude pts/1
+90006 1 claude ?
+90007 1 node pts/20
+EOF
+
+WT_LIST_BEFORE_ORPHAN=$(git -C "$REPO" worktree list --porcelain)
+OUT_ORPHAN=$(cd "$SANDBOX" && VMCLEANUP_PROCESSES_FILE="$FAKE_PS" bash "$SCRIPT" 2>&1)
+WT_LIST_AFTER_ORPHAN=$(git -C "$REPO" worktree list --porcelain)
+
+grep -q "Dangling Claude Code processes" <<<"$OUT_ORPHAN" \
+  && pass "section 12 header present" || fail "section 12 header present"
+
+grep -q "pid=90001" <<<"$OUT_ORPHAN" \
+  && pass "orphaned bun (ppid=1, no claude ancestor, no tty) is reported" \
+  || fail "orphaned bun (ppid=1, no claude ancestor, no tty) is reported"
+
+! grep -q "pid=90002" <<<"$OUT_ORPHAN" \
+  && pass "bun with a live claude ancestor (90003) is NOT reported" \
+  || fail "bun with a live claude ancestor (90003) is NOT reported"
+
+grep -q "pid=90003" <<<"$OUT_ORPHAN" \
+  && pass "top-level claude with ppid=1 and a real tty is reported for review" \
+  || fail "top-level claude with ppid=1 and a real tty is reported for review"
+
+! grep -q "pid=90004" <<<"$OUT_ORPHAN" \
+  && pass "fork-subagent shape (claude, tty=?, live claude parent 90005) is NOT reported" \
+  || fail "fork-subagent shape (claude, tty=?, live claude parent 90005) is NOT reported"
+
+grep -q "pid=90006.*no controlling terminal" <<<"$OUT_ORPHAN" \
+  && pass "orphaned claude (ppid=1, tty=?) reported as likely leaked" \
+  || fail "orphaned claude (ppid=1, tty=?) reported as likely leaked"
+
+grep -q "pid=90007.*has a terminal" <<<"$OUT_ORPHAN" \
+  && pass "orphaned node with a real tty is reported but annotated for manual verification" \
+  || fail "orphaned node with a real tty is reported but annotated for manual verification"
+
+[[ "$WT_LIST_BEFORE_ORPHAN" == "$WT_LIST_AFTER_ORPHAN" ]] \
+  && pass "process review section performs no mutation of unrelated state" \
+  || fail "process review section performs no mutation of unrelated state"
+
 echo
 if [[ $FAIL -eq 0 ]]; then
   echo "RESULT: GREEN (all assertions passed)"
