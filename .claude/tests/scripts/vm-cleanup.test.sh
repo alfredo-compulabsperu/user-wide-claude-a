@@ -159,6 +159,73 @@ grep -q '\[SAFE\].*~/.cache/foo' <<<"$OUT_CACHE" && grep -q '\[SAFE\].*~/.cache/
   && pass "[SAFE] reported for .cache/foo and .cache/bar" \
   || fail "[SAFE] reported for .cache/foo and .cache/bar"
 
+# ── Task 2: ~/.vscode-server stale-version pruning (US-VMCLEANUP-5) ─────────
+# Normal case: bin/ names the current version; cli/servers/ holds the current
+# (must survive), a stale Stable-* (must be pruned), and a stale .staging
+# entry (must be pruned); extensions/ and data/ marker files must never be
+# touched.
+rm -rf "$HOME_DIR/.vscode-server"
+mkdir -p "$HOME_DIR/.vscode-server/bin/hash-A" \
+  "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-A" \
+  "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-B" \
+  "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-C.staging" \
+  "$HOME_DIR/.vscode-server/extensions" \
+  "$HOME_DIR/.vscode-server/data"
+echo x > "$HOME_DIR/.vscode-server/extensions/marker-file"
+echo x > "$HOME_DIR/.vscode-server/data/marker-file"
+
+OUT_VSCS=$(cd "$SANDBOX" && bash "$SCRIPT" --clean 2>&1)
+
+[[ -d "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-A" ]] \
+  && pass "current .vscode-server version (Stable-hash-A) survives pruning" \
+  || fail "current .vscode-server version (Stable-hash-A) survives pruning"
+
+[[ ! -d "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-B" ]] \
+  && [[ ! -d "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-C.staging" ]] \
+  && pass "stale Stable-hash-B and .staging entry are pruned" \
+  || fail "stale Stable-hash-B and .staging entry are pruned"
+
+[[ -f "$HOME_DIR/.vscode-server/extensions/marker-file" ]] \
+  && [[ -f "$HOME_DIR/.vscode-server/data/marker-file" ]] \
+  && pass "extensions/ and data/ marker files untouched" \
+  || fail "extensions/ and data/ marker files untouched"
+
+grep -q '\[SAFE\].*Stable-hash-B' <<<"$OUT_VSCS" && grep -q '\[SAFE\].*Stable-hash-C.staging' <<<"$OUT_VSCS" \
+  && pass "[SAFE] reported for the 2 pruned .vscode-server entries" \
+  || fail "[SAFE] reported for the 2 pruned .vscode-server entries"
+
+# Edge case: bin/ has zero entries -- pruning must skip entirely, never guess.
+rm -rf "$HOME_DIR/.vscode-server"
+mkdir -p "$HOME_DIR/.vscode-server/bin" "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-Z"
+
+OUT_VSCS_ZERO=$(cd "$SANDBOX" && bash "$SCRIPT" --clean 2>&1)
+
+[[ -d "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-Z" ]] \
+  && pass "bin/ with 0 entries: pruning skipped, nothing under cli/servers/ touched" \
+  || fail "bin/ with 0 entries: pruning skipped, nothing under cli/servers/ touched"
+
+grep -qi "cannot identify a single current version" <<<"$OUT_VSCS_ZERO" \
+  && pass "bin/ with 0 entries: skip message printed" \
+  || fail "bin/ with 0 entries: skip message printed"
+
+# Edge case: bin/ has 2+ entries -- pruning must skip entirely, never guess.
+rm -rf "$HOME_DIR/.vscode-server"
+mkdir -p "$HOME_DIR/.vscode-server/bin/hash-D" "$HOME_DIR/.vscode-server/bin/hash-E" \
+  "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-D"
+
+OUT_VSCS_MULTI=$(cd "$SANDBOX" && bash "$SCRIPT" --clean 2>&1)
+
+[[ -d "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-D" ]] \
+  && pass "bin/ with 2+ entries: pruning skipped, nothing under cli/servers/ touched" \
+  || fail "bin/ with 2+ entries: pruning skipped, nothing under cli/servers/ touched"
+
+grep -qi "cannot identify a single current version" <<<"$OUT_VSCS_MULTI" \
+  && pass "bin/ with 2+ entries: skip message printed" \
+  || fail "bin/ with 2+ entries: skip message printed"
+
+# Clean sandbox state before the main run below picks up $HOME_DIR again.
+rm -rf "$HOME_DIR/.vscode-server"
+
 # ── Run 2: --clean --risky (main destructive run) ────────────────────────────
 OUT=$(cd "$SANDBOX" && bash "$SCRIPT" --clean --risky 2>&1)
 RC=$?
