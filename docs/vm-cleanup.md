@@ -1,10 +1,11 @@
 # vm-cleanup.sh
 
 Scans and cleans common dev-VM disk consumers: apt cache, journald logs, npm
-cache, `~/.cache` subdirs, snap disabled revisions, the Firebase emulator
-cache, Trash, `node_modules`, stale git worktrees, and old `nvm` node
-versions. Also reports (never kills) dangling Claude Code processes — see
-[Dangling process detection](#dangling-process-detection).
+cache, `~/.cache` (full wipe, excluding `firebase/`), stale VS Code Remote
+server versions under `~/.vscode-server`, snap disabled revisions, the
+Firebase emulator cache, Trash, `node_modules`, stale git worktrees, and old
+`nvm` node versions. Also reports (never kills) dangling Claude Code
+processes — see [Dangling process detection](#dangling-process-detection).
 
 ## Usage
 
@@ -20,7 +21,7 @@ vm-cleanup.sh -h | --help      # show help
 
 | Tier | Executes | Targets |
 |---|---|---|
-| **SAFE** | Automatically, in `--clean` mode (low risk, recoverable) | apt cache, journald logs, npm cache, `~/.cache` subdirs (`thumbnails`, `fontconfig`, `pip`) |
+| **SAFE** | Automatically, in `--clean` mode (low risk, recoverable) | apt cache, journald logs, npm cache, `~/.cache` in full (except `firebase/`, which stays RISKY-tier — see below), stale `~/.vscode-server` versions (keeps the current one) |
 | **RISKY** | Only with `--clean --risky` (higher risk / harder to recover) | git worktrees (clean, pushed, unlocked only), `node_modules` outside active worktrees, Trash, old `nvm` node versions, snap disabled revisions, Firebase emulator cache |
 
 ## Protected files
@@ -77,6 +78,27 @@ it:
 
 This script's own process tree (and its invoking Claude Code session, if
 any) is never reported, however far its ancestor chain runs.
+
+## VS Code Remote server pruning
+
+`~/.vscode-server/cli/servers/` accumulates a full server install
+(hundreds of MB each) for every VS Code Remote-SSH client update, since the
+client never prunes old versions on its own. Every run with `--clean`
+identifies the currently-active version via the single directory under
+`~/.vscode-server/bin/`, then deletes every `cli/servers/` entry that isn't
+exactly `Stable-<current-hash>` — this naturally also removes incomplete
+`.staging` entries with no special-casing needed.
+
+This is why it's safe: every deleted entry is a confirmed-stale,
+unreferenced version — never the one the active VS Code Remote connection
+is using — so pruning never forces a reconnect or redownload. It never
+touches `~/.vscode-server/extensions/`, `~/.vscode-server/data/`, or the
+current `bin/`/`cli/servers/` pair.
+
+If `~/.vscode-server/bin/` doesn't have exactly one entry (e.g. a client
+update is mid-flight), pruning is skipped entirely with an explanatory
+message rather than guessing which version is current. A second
+consecutive `--clean` run is a no-op once nothing stale remains.
 
 ## Exit codes
 
