@@ -36,8 +36,8 @@ plan) — Tasks 1-2 add new assertions to it, they don't create it.
 |---|---|---|---|
 | 1 | Task 1 | `.cache` whole-dir wipe: RED (sandboxed `.cache` w/ `foo`/`bar`/`firebase/emulators`/`thumbnails` fixtures) → GREEN (rewrite section 6, exclude `firebase`) | done |
 | 2 | Task 2 | `.vscode-server` stale-version pruning: RED (sandboxed `bin/`+`cli/servers/` fixtures incl. `.staging` and 0/2+-entry edge cases) → GREEN (new final section) | done |
-| 3 | Task 3 | Docs: `docs/vm-cleanup.md` classification table SAFE row + new `.vscode-server` prose section | pending |
-| 4 | Task 4 | Flip US-VMCLEANUP-4/-5 `Implementation: Open → Closed` in `docs/user-stories/vm-cleanup.md`, version-history entry, update `docs/user-stories/index.md` | pending |
+| 3 | Task 3 | Docs: `docs/vm-cleanup.md` classification table SAFE row + new `.vscode-server` prose section | done |
+| 4 | Task 4 | Flip US-VMCLEANUP-4/-5 `Implementation: Open → Closed` in `docs/user-stories/vm-cleanup.md`, version-history entry, update `docs/user-stories/index.md` | done |
 
 ## Stop Condition Check
 

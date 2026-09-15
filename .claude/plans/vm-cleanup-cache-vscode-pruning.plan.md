@@ -2,7 +2,7 @@
 
 **Source**: `docs/user-stories/vm-cleanup.md` (US-VMCLEANUP-4, US-VMCLEANUP-5)
 **Complexity**: Medium
-**Status**: pending — plan approved for save, implementation not yet started
+**Status**: complete — all 4 tasks implemented, validated, and committed
 
 ## Summary
 
@@ -126,11 +126,11 @@ bash .claude/scripts/vm-cleanup.sh --dry-run   # manual: confirm new targets sho
 - [x] Pruning skips entirely (never guesses) when `bin/` doesn't have exactly one entry
 - [x] Second consecutive `--clean` run is a no-op for `.vscode-server` pruning
 - [x] `shellcheck` clean (no new findings beyond the pre-existing baseline)
-- [ ] `bash .claude/tests/run-all.sh` fully green
-- [ ] `docs/vm-cleanup.md` and `docs/user-stories/vm-cleanup.md` updated
+- [x] `bash .claude/tests/run-all.sh` fully green
+- [x] `docs/vm-cleanup.md` and `docs/user-stories/vm-cleanup.md` updated
 
 ## Acceptance
 
-- [ ] All tasks complete
-- [ ] Validation passes
-- [ ] Patterns mirrored, not reinvented
+- [x] All tasks complete
+- [x] Validation passes
+- [x] Patterns mirrored, not reinvented

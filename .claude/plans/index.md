@@ -19,3 +19,5 @@ whose file has been deleted or moved.
 | [vm-cleanup-hardening.plan.md](vm-cleanup-hardening.plan.md) | vm-cleanup.sh hardening — land stranded `18ceb9d`, rename `--yes`→`--risky`, exit-code + idempotency + coverage gates | complete |
 | [vm-cleanup-hardening-loop-runbook.md](vm-cleanup-hardening-loop-runbook.md) | Loop runbook (sequential, fast mode) driving the vm-cleanup-hardening plan's 7 tasks | complete |
 | [sync-skip-diff.plan.md](sync-skip-diff.plan.md) | `sync.sh` — `--skip-diff`/`-sd` flag to bypass overwrite prompts | complete |
+| [vm-cleanup-cache-vscode-pruning.plan.md](vm-cleanup-cache-vscode-pruning.plan.md) | vm-cleanup.sh — US-VMCLEANUP-4/-5: full `.cache` SAFE-tier wipe + `.vscode-server` stale-version pruning | complete |
+| [vm-cleanup-cache-vscode-pruning-loop-runbook.md](vm-cleanup-cache-vscode-pruning-loop-runbook.md) | Loop runbook (sequential, fast mode) driving the cache/vscode-pruning plan's 4 tasks | complete |
