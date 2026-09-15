@@ -186,9 +186,12 @@ file_sha256() {
 }
 
 # -print0 / sort -z / xargs -0 handle filenames with spaces (C2); -r avoids stdin-block on empty dirs (I1)
+# `cd` first so sha256sum emits paths relative to the directory root: the repo copy
+# and the ~/.claude copy live at different absolute paths, so hashing absolute paths
+# would make identical directories hash differently and never report [OK].
 dir_sha256() {
   local hashes
-  if ! hashes=$(find "$1" -type f -print0 | sort -z | xargs -0 -r "${SHA256_CMD[@]}"); then
+  if ! hashes=$(cd "$1" && find . -type f -print0 | sort -z | xargs -0 -r "${SHA256_CMD[@]}"); then
     return 1
   fi
   if [[ -z "$hashes" ]]; then
