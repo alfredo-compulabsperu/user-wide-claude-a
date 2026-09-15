@@ -122,10 +122,10 @@ bash .claude/scripts/vm-cleanup.sh --dry-run   # manual: confirm new targets sho
 ## Acceptance Criteria
 
 - [x] `/vm-cleanup --clean` deletes `~/.cache` in full except `firebase/`, which stays RISKY-tier unchanged
-- [ ] `/vm-cleanup --clean` prunes stale `~/.vscode-server` versions, keeps the current one, never touches `extensions/`/`data/`
-- [ ] Pruning skips entirely (never guesses) when `bin/` doesn't have exactly one entry
-- [ ] Second consecutive `--clean` run is a no-op for `.vscode-server` pruning
-- [ ] `shellcheck` clean (no new findings beyond the pre-existing baseline)
+- [x] `/vm-cleanup --clean` prunes stale `~/.vscode-server` versions, keeps the current one, never touches `extensions/`/`data/`
+- [x] Pruning skips entirely (never guesses) when `bin/` doesn't have exactly one entry
+- [x] Second consecutive `--clean` run is a no-op for `.vscode-server` pruning
+- [x] `shellcheck` clean (no new findings beyond the pre-existing baseline)
 - [ ] `bash .claude/tests/run-all.sh` fully green
 - [ ] `docs/vm-cleanup.md` and `docs/user-stories/vm-cleanup.md` updated
 
