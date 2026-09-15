@@ -12,6 +12,7 @@ skills:
   - name: ship
   - name: gh-pr-update
   - name: gh-issue-create
+  - name: audit-plan
 
 commands:
   - name: open-claude.md
