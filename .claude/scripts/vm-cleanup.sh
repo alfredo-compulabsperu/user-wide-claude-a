@@ -424,6 +424,31 @@ done <<< "$PS_SNAP"
 
 $FOUND_ORPHAN || echo "  none found"
 
+# ── 13. ~/.vscode-server (SAFE — prune stale server versions, keep current) ──
+_section ".vscode-server (SAFE — prune stale server versions, keep current)"
+VSCS="$HOME/.vscode-server"
+if [[ ! -d "$VSCS" ]]; then
+  echo "  not present"
+else
+  mapfile -t BIN_ENTRIES < <(find "$VSCS/bin" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
+  if [[ ${#BIN_ENTRIES[@]} -ne 1 ]]; then
+    echo "  cannot identify a single current version under ~/.vscode-server/bin (found ${#BIN_ENTRIES[@]}) -- skipping prune for safety"
+  else
+    CURRENT_HASH=$(basename "${BIN_ENTRIES[0]}")
+    FOUND_STALE=false
+    while IFS= read -r entry; do
+      name=$(basename "$entry")
+      [[ "$name" == "Stable-${CURRENT_HASH}" ]] && continue
+      SZ=$(_human "$entry")
+      echo "  ~/.vscode-server/cli/servers/${name}: ${SZ}"
+      _add "$entry"
+      _safe "rm -rf ~/.vscode-server/cli/servers/${name}" rm -rf "$entry"
+      FOUND_STALE=true
+    done < <(find "$VSCS/cli/servers" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
+    $FOUND_STALE || echo "  no stale versions found (current: ${CURRENT_HASH:0:12}...)"
+  fi
+fi
+
 # ── summary ───────────────────────────────────────────────────────────────────
 _section "Summary"
 df -h /
