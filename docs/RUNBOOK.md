@@ -26,6 +26,7 @@ Output legend:
 | `[MISSING]` | Artifact in manifest but not in `~/.claude/` |
 | `[STALE]` | Artifact present but SHA-256 differs from repo |
 | `[SKIP]` | SHA-256 differs; skipped per idempotency policy |
+| `[SKIPPED]` | SHA-256 differs; user (or `--skip-diff`) declined the overwrite prompt |
 | `[LOCAL_ONLY]` | Artifact in `~/.claude/` not listed in manifest |
 | `[MISSING_PLUGIN]` | Plugin in manifest not found in installed plugins |
 
@@ -36,6 +37,19 @@ bash sync.sh --force
 ```
 
 Use when `[STALE]` entries should be overwritten without prompting.
+
+## Skip All Confirmation Prompts
+
+```bash
+bash sync.sh --skip-diff
+```
+
+When `manifest.yaml`'s `idempotency: prompt` (or a hand-edited destination)
+would otherwise stop and ask `Overwrite ...? [y/N]` for every differing
+artifact, `--skip-diff` auto-declines each one instead — reports `[SKIPPED]`,
+writes nothing, never reads stdin. Runs unattended. Does not weaken
+`--force`/`--force-diverged`, which still overwrite as usual even when
+`--skip-diff` is also passed.
 
 ## Promote a Local-Only Artifact
 

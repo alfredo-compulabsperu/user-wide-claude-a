@@ -128,6 +128,104 @@ WT_LIST_AFTER_SCAN=$(git -C "$REPO" worktree list --porcelain)
   && pass "scan mode (no flags) mutates nothing" \
   || fail "scan mode (no flags) mutates nothing"
 
+# ── Task 1: ~/.cache whole-dir wipe (US-VMCLEANUP-4), plain --clean (no --risky) ──
+# foo/bar are arbitrary regenerable tool-cache stand-ins; thumbnails is a
+# regression check (already SAFE-wiped today, must stay wiped after the
+# section 6 rewrite); firebase/emulators must survive section 6 under plain
+# --clean (no --risky) — only section 7 (RISKY) may ever remove it, and only
+# when --risky is passed, which this run deliberately omits.
+mkdir -p "$HOME_DIR/.cache/foo" "$HOME_DIR/.cache/bar" \
+  "$HOME_DIR/.cache/thumbnails" "$HOME_DIR/.cache/firebase/emulators"
+echo x > "$HOME_DIR/.cache/foo/f"
+echo x > "$HOME_DIR/.cache/bar/f"
+echo x > "$HOME_DIR/.cache/thumbnails/f"
+echo x > "$HOME_DIR/.cache/firebase/emulators/f"
+
+OUT_CACHE=$(cd "$SANDBOX" && bash "$SCRIPT" --clean 2>&1)
+
+[[ ! -d "$HOME_DIR/.cache/foo" ]] && [[ ! -d "$HOME_DIR/.cache/bar" ]] \
+  && pass "arbitrary .cache subdirs (foo/bar) are wiped" \
+  || fail "arbitrary .cache subdirs (foo/bar) are wiped"
+
+[[ ! -d "$HOME_DIR/.cache/thumbnails" ]] \
+  && pass ".cache/thumbnails still wiped (regression check)" \
+  || fail ".cache/thumbnails still wiped (regression check)"
+
+[[ -f "$HOME_DIR/.cache/firebase/emulators/f" ]] \
+  && pass ".cache/firebase/emulators preserved under plain --clean (no --risky)" \
+  || fail ".cache/firebase/emulators preserved under plain --clean (no --risky)"
+
+grep -q '\[SAFE\].*~/.cache/foo' <<<"$OUT_CACHE" && grep -q '\[SAFE\].*~/.cache/bar' <<<"$OUT_CACHE" \
+  && pass "[SAFE] reported for .cache/foo and .cache/bar" \
+  || fail "[SAFE] reported for .cache/foo and .cache/bar"
+
+# ── Task 2: ~/.vscode-server stale-version pruning (US-VMCLEANUP-5) ─────────
+# Normal case: bin/ names the current version; cli/servers/ holds the current
+# (must survive), a stale Stable-* (must be pruned), and a stale .staging
+# entry (must be pruned); extensions/ and data/ marker files must never be
+# touched.
+rm -rf "$HOME_DIR/.vscode-server"
+mkdir -p "$HOME_DIR/.vscode-server/bin/hash-A" \
+  "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-A" \
+  "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-B" \
+  "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-C.staging" \
+  "$HOME_DIR/.vscode-server/extensions" \
+  "$HOME_DIR/.vscode-server/data"
+echo x > "$HOME_DIR/.vscode-server/extensions/marker-file"
+echo x > "$HOME_DIR/.vscode-server/data/marker-file"
+
+OUT_VSCS=$(cd "$SANDBOX" && bash "$SCRIPT" --clean 2>&1)
+
+[[ -d "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-A" ]] \
+  && pass "current .vscode-server version (Stable-hash-A) survives pruning" \
+  || fail "current .vscode-server version (Stable-hash-A) survives pruning"
+
+[[ ! -d "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-B" ]] \
+  && [[ ! -d "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-C.staging" ]] \
+  && pass "stale Stable-hash-B and .staging entry are pruned" \
+  || fail "stale Stable-hash-B and .staging entry are pruned"
+
+[[ -f "$HOME_DIR/.vscode-server/extensions/marker-file" ]] \
+  && [[ -f "$HOME_DIR/.vscode-server/data/marker-file" ]] \
+  && pass "extensions/ and data/ marker files untouched" \
+  || fail "extensions/ and data/ marker files untouched"
+
+grep -q '\[SAFE\].*Stable-hash-B' <<<"$OUT_VSCS" && grep -q '\[SAFE\].*Stable-hash-C.staging' <<<"$OUT_VSCS" \
+  && pass "[SAFE] reported for the 2 pruned .vscode-server entries" \
+  || fail "[SAFE] reported for the 2 pruned .vscode-server entries"
+
+# Edge case: bin/ has zero entries -- pruning must skip entirely, never guess.
+rm -rf "$HOME_DIR/.vscode-server"
+mkdir -p "$HOME_DIR/.vscode-server/bin" "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-Z"
+
+OUT_VSCS_ZERO=$(cd "$SANDBOX" && bash "$SCRIPT" --clean 2>&1)
+
+[[ -d "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-Z" ]] \
+  && pass "bin/ with 0 entries: pruning skipped, nothing under cli/servers/ touched" \
+  || fail "bin/ with 0 entries: pruning skipped, nothing under cli/servers/ touched"
+
+grep -qi "cannot identify a single current version" <<<"$OUT_VSCS_ZERO" \
+  && pass "bin/ with 0 entries: skip message printed" \
+  || fail "bin/ with 0 entries: skip message printed"
+
+# Edge case: bin/ has 2+ entries -- pruning must skip entirely, never guess.
+rm -rf "$HOME_DIR/.vscode-server"
+mkdir -p "$HOME_DIR/.vscode-server/bin/hash-D" "$HOME_DIR/.vscode-server/bin/hash-E" \
+  "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-D"
+
+OUT_VSCS_MULTI=$(cd "$SANDBOX" && bash "$SCRIPT" --clean 2>&1)
+
+[[ -d "$HOME_DIR/.vscode-server/cli/servers/Stable-hash-D" ]] \
+  && pass "bin/ with 2+ entries: pruning skipped, nothing under cli/servers/ touched" \
+  || fail "bin/ with 2+ entries: pruning skipped, nothing under cli/servers/ touched"
+
+grep -qi "cannot identify a single current version" <<<"$OUT_VSCS_MULTI" \
+  && pass "bin/ with 2+ entries: skip message printed" \
+  || fail "bin/ with 2+ entries: skip message printed"
+
+# Clean sandbox state before the main run below picks up $HOME_DIR again.
+rm -rf "$HOME_DIR/.vscode-server"
+
 # ── Run 2: --clean --risky (main destructive run) ────────────────────────────
 OUT=$(cd "$SANDBOX" && bash "$SCRIPT" --clean --risky 2>&1)
 RC=$?
@@ -282,6 +380,56 @@ RC_FAILINJECT=$?
 [[ $RC_FAILINJECT -ne 0 ]] && grep -qi "Failed actions" <<<"$OUT_FAILINJECT" \
   && pass "a failing SAFE action causes non-zero exit and appears in the Summary" \
   || fail "a failing SAFE action causes non-zero exit and appears in the Summary"
+
+# ── Run 10: section 12 — dangling process detection (synthetic ps table) ────
+# A real system's own process tree can't be safely fuzzed in a test, so this
+# feeds a synthetic "pid ppid comm tty" table via VMCLEANUP_PROCESSES_FILE
+# instead of letting the script call the real `ps`.
+FAKE_PS="$SANDBOX/fake-ps.txt"
+cat > "$FAKE_PS" <<'EOF'
+90001 1 bun ?
+90002 90003 bun ?
+90003 1 claude pts/9
+90004 90005 claude ?
+90005 1 claude pts/1
+90006 1 claude ?
+90007 1 node pts/20
+EOF
+
+WT_LIST_BEFORE_ORPHAN=$(git -C "$REPO" worktree list --porcelain)
+OUT_ORPHAN=$(cd "$SANDBOX" && VMCLEANUP_PROCESSES_FILE="$FAKE_PS" bash "$SCRIPT" 2>&1)
+WT_LIST_AFTER_ORPHAN=$(git -C "$REPO" worktree list --porcelain)
+
+grep -q "Dangling Claude Code processes" <<<"$OUT_ORPHAN" \
+  && pass "section 12 header present" || fail "section 12 header present"
+
+grep -q "pid=90001" <<<"$OUT_ORPHAN" \
+  && pass "orphaned bun (ppid=1, no claude ancestor, no tty) is reported" \
+  || fail "orphaned bun (ppid=1, no claude ancestor, no tty) is reported"
+
+! grep -q "pid=90002" <<<"$OUT_ORPHAN" \
+  && pass "bun with a live claude ancestor (90003) is NOT reported" \
+  || fail "bun with a live claude ancestor (90003) is NOT reported"
+
+grep -q "pid=90003" <<<"$OUT_ORPHAN" \
+  && pass "top-level claude with ppid=1 and a real tty is reported for review" \
+  || fail "top-level claude with ppid=1 and a real tty is reported for review"
+
+! grep -q "pid=90004" <<<"$OUT_ORPHAN" \
+  && pass "fork-subagent shape (claude, tty=?, live claude parent 90005) is NOT reported" \
+  || fail "fork-subagent shape (claude, tty=?, live claude parent 90005) is NOT reported"
+
+grep -q "pid=90006.*no controlling terminal" <<<"$OUT_ORPHAN" \
+  && pass "orphaned claude (ppid=1, tty=?) reported as likely leaked" \
+  || fail "orphaned claude (ppid=1, tty=?) reported as likely leaked"
+
+grep -q "pid=90007.*has a terminal" <<<"$OUT_ORPHAN" \
+  && pass "orphaned node with a real tty is reported but annotated for manual verification" \
+  || fail "orphaned node with a real tty is reported but annotated for manual verification"
+
+[[ "$WT_LIST_BEFORE_ORPHAN" == "$WT_LIST_AFTER_ORPHAN" ]] \
+  && pass "process review section performs no mutation of unrelated state" \
+  || fail "process review section performs no mutation of unrelated state"
 
 echo
 if [[ $FAIL -eq 0 ]]; then

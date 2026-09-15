@@ -8,6 +8,7 @@ MANIFEST="$REPO_DIR/manifest.yaml"
 DRY_RUN=0
 FORCE=0
 FORCE_DIVERGED=0
+SKIP_DIFF=0
 ALLOW_BRANCH=0
 SUBCOMMAND="install"
 ALLOWED_BRANCHES=(develop main master)
@@ -31,6 +32,9 @@ Options:
   -f, --force           Overwrite existing files even when SHA-256 differs (no prompt)
   -D, --force-diverged  Also overwrite destinations edited out-of-band since last sync
                         (plain --force never does this — see [DIVERGED] below)
+  -sd, --skip-diff      Never prompt for a differing artifact — auto-decline (report
+                        [SKIPPED], write nothing) instead of asking [y/N]. Does not
+                        weaken --force/--force-diverged, which still overwrite.
   -B, --allow-branch    Allow a real (non-dry-run) sync from a branch other than
                         develop/main/master (default: refuse — see [BRANCH GUARD] below)
   -h, --help            Show this help
@@ -52,6 +56,7 @@ while [[ $# -gt 0 ]]; do
     -n|--dry-run)        DRY_RUN=1 ;;
     -f|--force)          FORCE=1 ;;
     -D|--force-diverged) FORCE_DIVERGED=1 ;;
+    -sd|--skip-diff)     SKIP_DIFF=1 ;;
     -B|--allow-branch)   ALLOW_BRANCH=1 ;;
     -h|--help)           usage ;;
     install)              SUBCOMMAND="install" ;;
@@ -202,6 +207,19 @@ sync_state_set() {
   bash "$SYNC_STATE_SCRIPT" set "$1" "$2"
 }
 
+# _confirm_overwrite <prompt> -- true (0) = overwrite, false (1) = decline.
+# Single source of truth for the 4 near-identical "differs, what now?"
+# prompts below (ordinary-drift + diverged, file + dir). Under --skip-diff,
+# always declines without touching stdin at all.
+_confirm_overwrite() {
+  local prompt="$1" ans
+  if [[ $SKIP_DIFF -eq 1 ]]; then
+    return 1
+  fi
+  read -rp "$prompt" ans
+  [[ "${ans,,}" == "y" ]]
+}
+
 # --- install_file <repo_path> <dest_path> <label> ---
 install_file() {
   local src="$1" dest="$2" label="$3"
@@ -257,8 +275,7 @@ install_file() {
       (( CNT_UPDATED++ )) || true
       sync_state_set "$label" "$(file_sha256 "$dest")"
     else
-      read -rp "  Overwrite $label despite out-of-band edit? [y/N] " ans
-      if [[ "${ans,,}" == "y" ]]; then
+      if _confirm_overwrite "  Overwrite $label despite out-of-band edit? [y/N] "; then
         cp "$src" "$dest"
         echo "  [UPDATED]  $label"
         (( CNT_UPDATED++ )) || true
@@ -284,8 +301,7 @@ install_file() {
     echo "  [SKIP]     $label (SHA-256 differs; use --force to overwrite)"
     (( CNT_OK++ )) || true
   else
-    read -rp "  Overwrite $label? [y/N] " ans
-    if [[ "${ans,,}" == "y" ]]; then
+    if _confirm_overwrite "  Overwrite $label? [y/N] "; then
       cp "$src" "$dest"
       echo "  [UPDATED]  $label"
       (( CNT_UPDATED++ )) || true
@@ -386,8 +402,7 @@ install_dir() {
     if [[ $FORCE_DIVERGED -eq 1 ]]; then
       _overwrite_dir_and_record
     else
-      read -rp "  Overwrite $label/ despite out-of-band edit? [y/N] " ans
-      if [[ "${ans,,}" == "y" ]]; then
+      if _confirm_overwrite "  Overwrite $label/ despite out-of-band edit? [y/N] "; then
         _overwrite_dir_and_record
       else
         echo "  [SKIPPED]  $label/ (out-of-band edit preserved — consider /promote-artifact to sync it back into the repo)"
@@ -407,8 +422,7 @@ install_dir() {
     echo "  [SKIP]     $label/ (SHA-256 differs; use --force to overwrite)"
     (( CNT_OK++ )) || true
   else
-    read -rp "  Overwrite $label/? [y/N] " ans
-    if [[ "${ans,,}" == "y" ]]; then
+    if _confirm_overwrite "  Overwrite $label/? [y/N] "; then
       _overwrite_dir_and_record
     else
       echo "  [SKIPPED]  $label/"
