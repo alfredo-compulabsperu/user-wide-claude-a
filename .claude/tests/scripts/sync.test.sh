@@ -42,8 +42,12 @@ trap cleanup_sandbox EXIT
 # Manifest tracks exactly one artifact of the given kind, so every test run
 # needs at most one interactive prompt (avoids piped-answer ambiguity across
 # two overwrite prompts in a single invocation).
-setup_sandbox() {
-  local kind="$1"
+# setup_sandbox_idem <kind> <idempotency>: shared implementation behind
+# setup_sandbox (always "skip", today's default) and setup_sandbox_prompt
+# (idempotency: prompt, needed to exercise the ordinary-drift interactive
+# branch at all -- no existing sandbox reaches it).
+setup_sandbox_idem() {
+  local kind="$1" idem="$2"
   SCRATCH_REPO="$(mktemp -d)"
   SANDBOX_HOME="$(mktemp -d)"
   # Pre-create the usual ~/.claude/ subdirectories, matching a machine that's
@@ -57,8 +61,8 @@ setup_sandbox() {
 
   if [[ "$kind" == "script" ]]; then
     echo "v1" > "$SCRATCH_REPO/.claude/scripts/myscript.sh"
-    cat > "$SCRATCH_REPO/manifest.yaml" <<'EOF'
-idempotency: skip
+    cat > "$SCRATCH_REPO/manifest.yaml" <<EOF
+idempotency: $idem
 skills: []
 commands: []
 agents: []
@@ -73,8 +77,8 @@ EOF
   else
     mkdir -p "$SCRATCH_REPO/.claude/skills/myskill"
     echo "v1" > "$SCRATCH_REPO/.claude/skills/myskill/SKILL.md"
-    cat > "$SCRATCH_REPO/manifest.yaml" <<'EOF'
-idempotency: skip
+    cat > "$SCRATCH_REPO/manifest.yaml" <<EOF
+idempotency: $idem
 skills:
   - name: myskill
 commands: []
@@ -88,12 +92,25 @@ EOF
   fi
 }
 
+setup_sandbox() { setup_sandbox_idem "$1" skip; }
+setup_sandbox_prompt() { setup_sandbox_idem "$1" prompt; }
+
 # run_sync <answer> [sync.sh args...]: pipe <answer>\n as the overwrite-prompt
 # reply (empty string == just pressing Enter, i.e. decline) and run the
 # scratch sync.sh with HOME pointed at the sandbox.
 run_sync() {
   local answer="$1"; shift
   printf '%s\n' "$answer" | HOME="$SANDBOX_HOME" bash "$SCRATCH_REPO/sync.sh" "$@"
+}
+
+# run_sync_noninteractive [sync.sh args...]: stdin from /dev/null, not an
+# answer -- the actual proof that --skip-diff never reaches a `read`. If a
+# prompt branch weren't properly gated, `read -rp` against a closed stdin
+# returns immediately with an empty answer (decline), which would make a
+# weaker test (one that just checks "didn't hang") pass for the wrong reason;
+# these tests instead assert the [SKIPPED] label and untouched destination.
+run_sync_noninteractive() {
+  HOME="$SANDBOX_HOME" bash "$SCRATCH_REPO/sync.sh" "$@" < /dev/null
 }
 
 get_baseline() {
@@ -339,6 +356,106 @@ else
   echo "  rc=$rc"
   echo "$out"
   run_test "branch guard: --dry-run exempt from guard on a feature branch" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 15: ordinary drift, idempotency=prompt, --skip-diff, no stdin at all
+# → destination untouched, [SKIPPED] reported, exit 0 (no hang)
+# ---------------------------------------------------------------------------
+setup_sandbox_prompt script
+src="$SCRATCH_REPO/.claude/scripts/myscript.sh"
+dest="$SANDBOX_HOME/.claude/scripts/myscript.sh"
+mkdir -p "$(dirname "$dest")"
+echo "manually-created" > "$dest"
+out="$(run_sync_noninteractive --skip-diff)" && rc=0 || rc=$?
+if [[ $rc -eq 0 ]] && [[ "$(cat "$dest")" == "manually-created" ]] && grep -q '\[SKIPPED\]' <<< "$out"; then
+  run_test "ordinary drift + idempotency=prompt: --skip-diff skips without reading stdin" "pass"
+else
+  echo "  rc=$rc"; echo "$out"
+  run_test "ordinary drift + idempotency=prompt: --skip-diff skips without reading stdin" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 16: same, but for a directory (skill) install
+# ---------------------------------------------------------------------------
+setup_sandbox_prompt skill
+src="$SCRATCH_REPO/.claude/skills/myskill"
+dest="$SANDBOX_HOME/.claude/skills/myskill"
+mkdir -p "$dest"
+echo "manually-created" > "$dest/SKILL.md"
+out="$(run_sync_noninteractive --skip-diff)" && rc=0 || rc=$?
+if [[ $rc -eq 0 ]] && [[ "$(cat "$dest/SKILL.md")" == "manually-created" ]] && grep -q '\[SKIPPED\]' <<< "$out"; then
+  run_test "ordinary drift + idempotency=prompt (dir): --skip-diff skips without reading stdin" "pass"
+else
+  echo "  rc=$rc"; echo "$out"
+  run_test "ordinary drift + idempotency=prompt (dir): --skip-diff skips without reading stdin" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 17: diverged file, --skip-diff, no stdin → untouched, [SKIPPED], exit 0
+# ---------------------------------------------------------------------------
+setup_diverged_script
+dest="$SANDBOX_HOME/.claude/scripts/myscript.sh"
+out="$(run_sync_noninteractive --skip-diff)" && rc=0 || rc=$?
+if [[ $rc -eq 0 ]] && [[ "$(cat "$dest")" == "hand-edited" ]] && grep -q '\[SKIPPED\]' <<< "$out"; then
+  run_test "diverged file: --skip-diff skips without reading stdin" "pass"
+else
+  echo "  rc=$rc"; echo "$out"
+  run_test "diverged file: --skip-diff skips without reading stdin" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 18: diverged directory, --skip-diff, no stdin → untouched, [SKIPPED]
+# ---------------------------------------------------------------------------
+setup_sandbox skill
+src="$SCRATCH_REPO/.claude/skills/myskill"
+dest="$SANDBOX_HOME/.claude/skills/myskill"
+run_sync '' >/dev/null 2>&1 || true
+echo "hand-edited" > "$dest/SKILL.md"
+out="$(run_sync_noninteractive --skip-diff)" && rc=0 || rc=$?
+if [[ $rc -eq 0 ]] && [[ "$(cat "$dest/SKILL.md")" == "hand-edited" ]] && grep -q '\[SKIPPED\]' <<< "$out"; then
+  run_test "diverged dir: --skip-diff skips without reading stdin" "pass"
+else
+  echo "  rc=$rc"; echo "$out"
+  run_test "diverged dir: --skip-diff skips without reading stdin" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 19: --force still overwrites ordinary drift even with --skip-diff
+# present (skip-diff must not shadow an explicit --force)
+# ---------------------------------------------------------------------------
+setup_sandbox_prompt script
+src="$SCRATCH_REPO/.claude/scripts/myscript.sh"
+dest="$SANDBOX_HOME/.claude/scripts/myscript.sh"
+mkdir -p "$(dirname "$dest")"
+echo "manually-created" > "$dest"
+out="$(run_sync_noninteractive --force --skip-diff)" && rc=0 || rc=$?
+if [[ $rc -eq 0 ]] && [[ "$(cat "$dest")" == "v1" ]] && grep -q '\[UPDATED\]' <<< "$out"; then
+  run_test "--force overwrites even when --skip-diff is also passed" "pass"
+else
+  echo "  rc=$rc"; echo "$out"
+  run_test "--force overwrites even when --skip-diff is also passed" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 20: --force-diverged still overwrites a diverged file even with
+# --skip-diff present
+# ---------------------------------------------------------------------------
+setup_diverged_script
+src="$SCRATCH_REPO/.claude/scripts/myscript.sh"
+dest="$SANDBOX_HOME/.claude/scripts/myscript.sh"
+out="$(run_sync_noninteractive --force-diverged --skip-diff)" && rc=0 || rc=$?
+if [[ $rc -eq 0 ]] && [[ "$(cat "$dest")" == "$(cat "$src")" ]] && grep -q '\[UPDATED\]' <<< "$out"; then
+  run_test "--force-diverged overwrites even when --skip-diff is also passed" "pass"
+else
+  echo "  rc=$rc"; echo "$out"
+  run_test "--force-diverged overwrites even when --skip-diff is also passed" "fail"
 fi
 cleanup_sandbox
 
