@@ -460,6 +460,89 @@ fi
 cleanup_sandbox
 
 # ---------------------------------------------------------------------------
+# Test 21: identical directory reports [OK] regardless of absolute location
+#
+# dir_sha256() must hash each file's path RELATIVE to the directory root. The
+# repo copy and the ~/.claude copy always sit at different absolute paths, so
+# an absolute-path-sensitive hash can never report [OK] for a directory.
+# ---------------------------------------------------------------------------
+setup_sandbox skill
+mkdir -p "$SANDBOX_HOME/.claude/skills/myskill"
+echo "v1" > "$SANDBOX_HOME/.claude/skills/myskill/SKILL.md"
+out="$(run_sync '' --dry-run)" || true
+if grep -q '\[OK\].*skills/myskill' <<< "$out"; then
+  run_test "identical directory reports [OK] despite differing absolute paths" "pass"
+else
+  echo "$out"
+  run_test "identical directory reports [OK] despite differing absolute paths" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 22: directory with genuinely different content is still not [OK]
+# ---------------------------------------------------------------------------
+setup_sandbox skill
+mkdir -p "$SANDBOX_HOME/.claude/skills/myskill"
+echo "different" > "$SANDBOX_HOME/.claude/skills/myskill/SKILL.md"
+out="$(run_sync '' --dry-run)" || true
+if ! grep -q '\[OK\].*skills/myskill' <<< "$out" && grep -q 'skills/myskill' <<< "$out"; then
+  run_test "directory with different content is still reported as changed" "pass"
+else
+  echo "$out"
+  run_test "directory with different content is still reported as changed" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 23: identical bytes under a different filename count as changed
+# (layout is part of the hash, not just content)
+# ---------------------------------------------------------------------------
+setup_sandbox skill
+mkdir -p "$SANDBOX_HOME/.claude/skills/myskill"
+echo "v1" > "$SANDBOX_HOME/.claude/skills/myskill/OTHER.md"
+out="$(run_sync '' --dry-run)" || true
+if ! grep -q '\[OK\].*skills/myskill' <<< "$out"; then
+  run_test "same bytes under a different filename counts as changed" "pass"
+else
+  echo "$out"
+  run_test "same bytes under a different filename counts as changed" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 24: two empty directories compare equal (the 'empty-dir' branch)
+# ---------------------------------------------------------------------------
+setup_sandbox skill
+rm -f "$SCRATCH_REPO/.claude/skills/myskill/SKILL.md"
+mkdir -p "$SANDBOX_HOME/.claude/skills/myskill"
+out="$(run_sync '' --dry-run)" || true
+if grep -q '\[OK\].*skills/myskill' <<< "$out"; then
+  run_test "two empty directories compare equal" "pass"
+else
+  echo "$out"
+  run_test "two empty directories compare equal" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
+# Test 25: nested files are hashed by relative path, so subdirectories match
+# ---------------------------------------------------------------------------
+setup_sandbox skill
+mkdir -p "$SCRATCH_REPO/.claude/skills/myskill/evals"
+echo "nested" > "$SCRATCH_REPO/.claude/skills/myskill/evals/evals.json"
+mkdir -p "$SANDBOX_HOME/.claude/skills/myskill/evals"
+echo "v1" > "$SANDBOX_HOME/.claude/skills/myskill/SKILL.md"
+echo "nested" > "$SANDBOX_HOME/.claude/skills/myskill/evals/evals.json"
+out="$(run_sync '' --dry-run)" || true
+if grep -q '\[OK\].*skills/myskill' <<< "$out"; then
+  run_test "nested files hashed by relative path" "pass"
+else
+  echo "$out"
+  run_test "nested files hashed by relative path" "fail"
+fi
+cleanup_sandbox
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

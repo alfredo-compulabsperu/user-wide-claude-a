@@ -28,23 +28,24 @@ was folded into the directory hash. An artifact's repo copy and its `~/.claude` 
 always live at different absolute paths, so `src_hash` could never equal `dest_hash`
 for a directory — no directory artifact could ever report `[OK]`, regardless of content.
 
-Validation command: `bats tests/`
+Five cases were added to the existing `sync.sh` suite as tests 15-19. Validation command:
 
 ```
-1..5
-not ok 1 byte-identical skill directory reports [OK]
-#   `[[ "$output" == *"[OK]"*"skills/demo"* ]]' failed
-ok 2 differing skill directory is still reported as changed
-ok 3 same bytes under a different filename counts as changed
-ok 4 two empty skill directories report [OK]
-not ok 5 nested files are hashed by their relative path
+bash .claude/tests/scripts/sync.test.sh
 ```
 
-Tests 1 and 5 fail for the intended reason. Test 4 passes even when broken because the
-empty-directory branch returns the literal `empty-dir`, which contains no path. Tests 2
-and 3 are guards: they must keep passing after the fix.
+Against the pre-fix `sync.sh`:
 
-Checkpoint: `1a6589b test: add reproducer for path-sensitive dir_sha256 in sync.sh`
+```
+FAIL: identical directory reports [OK] despite differing absolute paths
+FAIL: nested files hashed by relative path
+Results: 17 passed, 2 failed
+```
+
+Both failures are the intended defect. The three other new cases pass even while the
+bug is present and exist as guards — they must keep passing after the fix. The
+empty-directory case passes when broken because that branch returns the literal
+`empty-dir`, which contains no path.
 
 ### Apply the minimal fix (GREEN)
 
@@ -53,24 +54,18 @@ directory root. Content and layout still determine the hash; location no longer 
 `file_sha256()` needed no change — it cuts the hash out of `sha256sum`'s output and
 never saw the path.
 
-Validation command: `bats tests/`
-
 ```
-1..5
-ok 1 byte-identical skill directory reports [OK]
-ok 2 differing skill directory is still reported as changed
-ok 3 same bytes under a different filename counts as changed
-ok 4 two empty skill directories report [OK]
-ok 5 nested files are hashed by their relative path
-```
+bash .claude/tests/scripts/sync.test.sh
+Results: 19 passed, 0 failed
 
-Isolated 2nd pass, `env -i PATH=/usr/bin:/bin bats tests/` — all 5 pass with no ambient
-`HOME` and a minimal `PATH`, so nothing depends on leaked shell state.
+bash .claude/tests/run-all.sh
+  suites run:    8
+  suites passed: 8
+  suites failed: 0
+```
 
 Lint: `shellcheck sync.sh` reports one pre-existing `SC2034` (`SUBCOMMAND` unused,
 `sync.sh:57`), untouched by this change and deliberately left alone.
-
-Checkpoint: `c0bce1e fix: hash directory contents by relative path in sync.sh`
 
 ### Real-world confirmation
 
@@ -88,51 +83,66 @@ Four directories that were permanently `[STALE]` now read `[OK]`. `execute-plan`
 `[STALE]` and `diff -rq` confirms its `SKILL.md` genuinely differs — the fix did not
 blanket-approve everything.
 
+### Correction made during this run
+
+The five cases were first written as a new Bats suite at `tests/sync-dir-hash.bats`.
+That was wrong for this repo: CI (`.github/workflows/tests.yml`) runs
+`bash .claude/tests/run-all.sh`, which executes only `.claude/tests/scripts/*.test.sh`,
+and a `sync.test.sh` suite already existed. The Bats file would never have run in CI
+and duplicated an existing harness. The cases were ported into `sync.test.sh` using its
+own `setup_sandbox` / `run_sync` / `run_test` helpers, and the Bats file was deleted.
+RED was then re-verified in the real harness by restoring the pre-fix `sync.sh` via
+`git show`, as recorded above.
+
 ## Test specification
 
 | # | What is guaranteed | Test file or command | Test type | Result | Evidence |
 |---|--------------------|----------------------|-----------|--------|----------|
-| 1 | A byte-identical skill directory reports `[OK]` regardless of where each copy lives | `tests/sync-dir-hash.bats:byte-identical skill directory reports [OK]` | integration | PASS | `bats tests/` |
-| 2 | A skill directory with genuinely different content is still reported as changed | `tests/sync-dir-hash.bats:differing skill directory is still reported as changed` | integration | PASS | `bats tests/` |
-| 3 | Identical bytes under a different filename count as changed (layout is hashed) | `tests/sync-dir-hash.bats:same bytes under a different filename counts as changed` | integration | PASS | `bats tests/` |
-| 4 | Two empty directories compare equal via the `empty-dir` branch | `tests/sync-dir-hash.bats:two empty skill directories report [OK]` | integration | PASS | `bats tests/` |
-| 5 | Nested files are hashed by relative path, so subdirectories compare correctly | `tests/sync-dir-hash.bats:nested files are hashed by their relative path` | integration | PASS | `bats tests/` |
+| 15 | A byte-identical directory reports `[OK]` regardless of where each copy lives | `.claude/tests/scripts/sync.test.sh:identical directory reports [OK] despite differing absolute paths` | integration | PASS | `bash .claude/tests/scripts/sync.test.sh` |
+| 16 | A directory with genuinely different content is still reported as changed | `.claude/tests/scripts/sync.test.sh:directory with different content is still reported as changed` | integration | PASS | `bash .claude/tests/scripts/sync.test.sh` |
+| 17 | Identical bytes under a different filename count as changed (layout is hashed) | `.claude/tests/scripts/sync.test.sh:same bytes under a different filename counts as changed` | integration | PASS | `bash .claude/tests/scripts/sync.test.sh` |
+| 18 | Two empty directories compare equal via the `empty-dir` branch | `.claude/tests/scripts/sync.test.sh:two empty directories compare equal` | integration | PASS | `bash .claude/tests/scripts/sync.test.sh` |
+| 19 | Nested files are hashed by relative path, so subdirectories compare correctly | `.claude/tests/scripts/sync.test.sh:nested files hashed by relative path` | integration | PASS | `bash .claude/tests/scripts/sync.test.sh` |
 
-Tests drive `sync.sh --dry-run` end to end inside a sandbox repo and a sandbox `HOME`
-under `$BATS_TEST_TMPDIR`. The real `~/.claude/` and the real `.sync-state.json` are
-never touched.
+Tests drive `sync.sh --dry-run` end to end inside a scratch repo and a sandbox `HOME`
+under `mktemp -d`, per the suite's existing convention. The real `~/.claude/` and the
+real `.sync-state.json` are never touched.
 
 ## Coverage and known gaps
 
-`kcov` is installed, but both `--include-path=sync.sh` and `--include-pattern=sync.sh`
-report `0.00%`: the suite executes a *copy* of `sync.sh` in a temp sandbox via
-`env bash …/sync.sh`, and kcov does not trace that nested subprocess under Bats. That
-figure is an instrumentation artifact, not a measurement, so no coverage percentage is
-claimed here. Qualitative checklist per the TDD skill's Bash-coverage guidance:
+No coverage percentage is claimed. `kcov` is installed, but both `--include-path=sync.sh`
+and `--include-pattern=sync.sh` report `0.00%`: every suite here executes a *copy* of
+`sync.sh` in a temp sandbox via a nested `bash` subprocess, which kcov does not trace.
+That figure is an instrumentation artifact, not a measurement. Qualitative checklist for
+the changed function:
 
 | `dir_sha256()` branch | Covered by |
 |---|---|
-| Non-empty dir, identical content and layout | Tests 1, 5 |
-| Non-empty dir, differing content | Test 2 |
-| Non-empty dir, differing layout (rename) | Test 3 |
-| Empty dir (`empty-dir` literal) | Test 4 |
+| Non-empty dir, identical content and layout | Tests 15, 19 |
+| Non-empty dir, differing content | Test 16 |
+| Non-empty dir, differing layout (rename) | Test 17 |
+| Empty dir (`empty-dir` literal) | Test 18 |
 | `find`/`xargs` failure -> `return 1` | **Not covered** |
 
 Known gaps, all pre-existing and out of scope for this fix:
 
 - The `return 1` failure path in `dir_sha256()` is untested; it needs an unreadable
-  directory, which is awkward to stage as root-independent.
-- Only `--dry-run` is exercised. `install_dir()`'s write paths — `[INSTALLED]`,
-  the `[DIVERGED]` prompt, `--force` / `--force-diverged` — have no tests.
+  directory, which is awkward to stage root-independently.
 - Filenames containing spaces or newlines are handled by `-print0`/`sort -z`/`xargs -0`
   but have no dedicated test.
+- Directory baselines recorded in `~/.claude/.sync-state.json` before this fix hold
+  absolute-path-derived hashes. They are harmless — the `[OK]` branch returns before the
+  divergence check and rewrites the baseline on the next real sync — but they are stale
+  until then.
 
 ## Merge evidence
 
 If these checkpoints are squashed, preserve:
 
-- **RED** — `bats tests/`: tests 1 and 5 fail; byte-identical skill dirs never report `[OK]`.
-- **GREEN** — `bats tests/`: 5/5 pass, plus a scrubbed `env -i PATH=/usr/bin:/bin bats tests/` pass.
+- **RED** — `bash .claude/tests/scripts/sync.test.sh` against pre-fix `sync.sh`:
+  17 passed, 2 failed; byte-identical directories never report `[OK]`.
+- **GREEN** — same command: 19 passed, 0 failed. Full CI entrypoint
+  `bash .claude/tests/run-all.sh`: 8 suites, 8 passed.
 - **Refactor** — none needed; the fix is one line plus an explanatory comment.
 
 ## Historial de versiones
@@ -140,3 +150,4 @@ If these checkpoints are squashed, preserve:
 | Versión | Fecha | Cambios |
 |---------|-------|---------|
 | 1.0 | 2026-09-15 | Creación inicial — RED/GREEN evidence for the dir_sha256 path-sensitivity fix |
+| 1.1 | 2026-09-15 | Ported cases from a standalone Bats suite into `.claude/tests/scripts/sync.test.sh` (the suite CI actually runs); re-verified RED/GREEN in that harness |
