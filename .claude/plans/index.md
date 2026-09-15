@@ -18,3 +18,4 @@ whose file has been deleted or moved.
 | [vm-cleanup-issue-36.plan.md](vm-cleanup-issue-36.plan.md) | Issue #36 — vm-cleanup.sh husk fix, depth-mismatch fix, track script in repo | complete |
 | [vm-cleanup-hardening.plan.md](vm-cleanup-hardening.plan.md) | vm-cleanup.sh hardening — land stranded `18ceb9d`, rename `--yes`→`--risky`, exit-code + idempotency + coverage gates | complete |
 | [vm-cleanup-hardening-loop-runbook.md](vm-cleanup-hardening-loop-runbook.md) | Loop runbook (sequential, fast mode) driving the vm-cleanup-hardening plan's 7 tasks | complete |
+| [sync-skip-diff.plan.md](sync-skip-diff.plan.md) | `sync.sh` — `--skip-diff`/`-sd` flag to bypass overwrite prompts | complete |
