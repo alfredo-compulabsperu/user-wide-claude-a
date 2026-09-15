@@ -128,6 +128,37 @@ WT_LIST_AFTER_SCAN=$(git -C "$REPO" worktree list --porcelain)
   && pass "scan mode (no flags) mutates nothing" \
   || fail "scan mode (no flags) mutates nothing"
 
+# ── Task 1: ~/.cache whole-dir wipe (US-VMCLEANUP-4), plain --clean (no --risky) ──
+# foo/bar are arbitrary regenerable tool-cache stand-ins; thumbnails is a
+# regression check (already SAFE-wiped today, must stay wiped after the
+# section 6 rewrite); firebase/emulators must survive section 6 under plain
+# --clean (no --risky) — only section 7 (RISKY) may ever remove it, and only
+# when --risky is passed, which this run deliberately omits.
+mkdir -p "$HOME_DIR/.cache/foo" "$HOME_DIR/.cache/bar" \
+  "$HOME_DIR/.cache/thumbnails" "$HOME_DIR/.cache/firebase/emulators"
+echo x > "$HOME_DIR/.cache/foo/f"
+echo x > "$HOME_DIR/.cache/bar/f"
+echo x > "$HOME_DIR/.cache/thumbnails/f"
+echo x > "$HOME_DIR/.cache/firebase/emulators/f"
+
+OUT_CACHE=$(cd "$SANDBOX" && bash "$SCRIPT" --clean 2>&1)
+
+[[ ! -d "$HOME_DIR/.cache/foo" ]] && [[ ! -d "$HOME_DIR/.cache/bar" ]] \
+  && pass "arbitrary .cache subdirs (foo/bar) are wiped" \
+  || fail "arbitrary .cache subdirs (foo/bar) are wiped"
+
+[[ ! -d "$HOME_DIR/.cache/thumbnails" ]] \
+  && pass ".cache/thumbnails still wiped (regression check)" \
+  || fail ".cache/thumbnails still wiped (regression check)"
+
+[[ -f "$HOME_DIR/.cache/firebase/emulators/f" ]] \
+  && pass ".cache/firebase/emulators preserved under plain --clean (no --risky)" \
+  || fail ".cache/firebase/emulators preserved under plain --clean (no --risky)"
+
+grep -q '\[SAFE\].*~/.cache/foo' <<<"$OUT_CACHE" && grep -q '\[SAFE\].*~/.cache/bar' <<<"$OUT_CACHE" \
+  && pass "[SAFE] reported for .cache/foo and .cache/bar" \
+  || fail "[SAFE] reported for .cache/foo and .cache/bar"
+
 # ── Run 2: --clean --risky (main destructive run) ────────────────────────────
 OUT=$(cd "$SANDBOX" && bash "$SCRIPT" --clean --risky 2>&1)
 RC=$?
