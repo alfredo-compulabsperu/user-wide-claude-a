@@ -216,16 +216,16 @@ else
   echo "  npm not found"
 fi
 
-# ── 6. ~/.cache safe subdirs ──────────────────────────────────────────────────
-_section "~/.cache (safe subdirs)"
-for subdir in thumbnails fontconfig pip; do
-  target="$HOME/.cache/$subdir"
-  [[ -d "$target" ]] || continue
-  SZ=$(_human "$target")
-  echo "  ~/.cache/${subdir}: ${SZ}"
-  _add "$target"
-  _safe "rm -rf ~/.cache/${subdir}" rm -rf "$target"
-done
+# ── 6. ~/.cache (SAFE — full wipe, except firebase/ which stays RISKY below) ──
+_section "~/.cache (SAFE — full wipe, except firebase/ which stays RISKY below)"
+while IFS= read -r entry; do
+  name=$(basename "$entry")
+  [[ "$name" == "firebase" ]] && continue
+  SZ=$(_human "$entry")
+  echo "  ~/.cache/${name}: ${SZ}"
+  _add "$entry"
+  _safe "rm -rf ~/.cache/${name}" rm -rf "$entry"
+done < <(find "$HOME/.cache" -mindepth 1 -maxdepth 1 2>/dev/null | sort)
 
 # ── 7. firebase emulator cache ────────────────────────────────────────────────
 _section "~/.cache/firebase/emulators"
