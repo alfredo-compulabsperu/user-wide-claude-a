@@ -1,0 +1,85 @@
+{
+  "skill_name": "audit-plan",
+  "evals": [
+    {
+      "id": 0,
+      "name": "harness-plan-known-gaps",
+      "prompt": "Before I launch this, can you audit it for gaps? It's an agent pipeline plan at ~/.claude/skills/audit-plan/evals/fixtures/bulk-opp-pipeline.plan.md",
+      "expected_output": "Detects orchestration signals and applies harness axes. Surfaces the known critical gaps: a synthesis/consolidation step (career-coach) running in parallel with the steps it depends on; VERDICT extraction with no defined mechanism; concurrent writes to the same review file; interactive guards in a spec invoked by isolated agents; undefined opp-slug naming convention. Output uses severity tiers, no confidence column on findings.",
+      "files": [],
+      "assertions": [
+        "Harness axes were auto-enabled (output references harness axes, concurrency model, or H1-H5)",
+        "Findings are grouped into severity tiers (Critical / High / Medium)",
+        "Catches a concurrency or dependency-ordering gap, OR the interactive-guard-in-isolated-agent gap",
+        "Findings table does NOT assign a per-finding confidence level (severity-only discipline)",
+        "Includes an axis-coverage summary table or per-axis PASS/FINDINGS roll-up",
+        "No --loop/--ploop flag present, so this ran as the default two-parallel-agent mode — output is a single reconciled finding set, not two separate raw reports shown side by side"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "db-migration-nonharness",
+      "prompt": "Here's my database migration runbook for tonight — review it for gaps before we run it. ~/.claude/skills/audit-plan/evals/fixtures/db-migration-runbook.md",
+      "expected_output": "Applies core axes only (no harness — this is not an agent orchestration plan). Surfaces: no precondition check that commerce_db is reachable/empty; no rollback or error path if any step fails; ambiguous ownership ('someone should send it to marketing', 'Platform team' with no per-step owner); no verification that row counts match or transform succeeded before cutover; transform script error handling for malformed customer_blob JSON undefined.",
+      "files": [],
+      "assertions": [
+        "Harness axes are correctly suppressed or marked N/A (plan has no orchestration signals)",
+        "Catches the missing rollback / error path (no recovery if a step fails)",
+        "Catches missing verification before cutover (no row-count or transform success check)",
+        "Catches ownership ambiguity (e.g. 'someone should send it', no per-step owner)",
+        "No --loop/--ploop flag present, so this ran as the default two-parallel-agent mode — output is a single reconciled finding set, not two separate raw reports shown side by side"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "cicd-clean-plan",
+      "prompt": "Is this payments-api rollout plan ready to execute? ~/.claude/skills/audit-plan/evals/fixtures/cicd-rollout-plan.md",
+      "expected_output": "Recognizes this is a well-formed plan. Most axes PASS. Does NOT pad with fabricated findings. May surface at most a minor/medium finding (e.g., 'rollback owner is whoever is on-call' is slightly ambiguous, or DATABASE_URL change mentioned in rollback but not in steps). Verdict if assessed should lean GO or GO-with-minor-conditions.",
+      "files": [],
+      "assertions": [
+        "Recognizes the plan is largely sound (majority of axes PASS, or explicitly notes strong pre-flight/rollback)",
+        "Does NOT fabricate Critical-severity findings (zero Critical)",
+        "Produces a readiness verdict (GO / HOLD / ready / not-ready)",
+        "No --loop/--ploop flag present, so this ran as the default two-parallel-agent mode — a clean plan should reconcile to the same near-empty findings set either way, not accumulate padding just because two passes ran"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "default-mode-single-pass-tag",
+      "prompt": "/audit-plan ~/.claude/skills/audit-plan/evals/fixtures/db-migration-runbook.md",
+      "expected_output": "Runs in the default two-parallel-agent mode (no --loop/--ploop passed). Two isolated agents (not forks, no visibility into each other or this conversation) independently audit the same plan against the same axis set, then the orchestrating instance reconciles: findings both agents caught are kept as-is; findings only one agent caught are kept but tagged '(single-pass)' in the Finding column; a severity disagreement on the same finding is resolved by keeping the lower severity per the skill's own anti-inflation calibration, noted in Rationale; an axis is marked FINDINGS if either pass found something, never silently PASS just because one pass missed it. Final output uses the same standard Output Format as any other mode — one table, not two.",
+      "files": [],
+      "assertions": [
+        "Output is a single reconciled Output Format table (Critical/High/Medium + Axis Coverage), not two separate per-agent reports",
+        "If the reconciliation surfaces a finding caught by only one of the two passes, it is tagged '(single-pass)' in the Finding column — not presented as equally corroborated as a finding both passes caught",
+        "No new confidence column is introduced anywhere in the table — confidence-style information (single-pass tag, severity-disagreement note) stays inside the Finding or Rationale text, per the skill's existing 'confidence is not a standard column' rule",
+        "Findings content still matches this plan's known gaps (missing rollback/error path, missing pre-cutover verification, ownership ambiguity) — reconciliation must not drop a real finding just because only one of the two passes caught it"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "ploop-isolated-phase1",
+      "prompt": "/audit-plan --ploop ~/.claude/skills/audit-plan/evals/fixtures/db-migration-runbook.md",
+      "expected_output": "Runs the full three-phase loop, but Phase 1 is executed by a single isolated agent (not inline, not a fork) instead of the orchestrating instance auditing directly. That agent receives the plan file read fresh, the axis definitions, and the Output Format + Assessment Output specs, and produces both the audit table and the Phase 1 verdict. The orchestrating instance relays that output verbatim, including the standard 'Loop Phase 1 complete. ... reply \"re-audit\" to continue.' message, then stops and waits — it does NOT proceed to Phase 2 on its own.",
+      "files": [],
+      "assertions": [
+        "Output includes the standard Phase 1 completion message with Critical/High/Medium counts and a Verdict + Confidence line",
+        "Output explicitly asks the user to fix Critical/High findings and reply \"re-audit\" to continue",
+        "Turn ends after Phase 1 — Phase 2 (isolated re-audit) does NOT run without the user's 're-audit' reply",
+        "Nothing in the visible output claims Phase 1 ran inline/in the main conversation — behaviorally indistinguishable in format from --loop's Phase 1 output, since only the execution mechanism (isolated agent vs. inline) differs, not the output shape"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "loop-ploop-mutual-exclusion",
+      "prompt": "/audit-plan --loop --ploop ~/.claude/skills/audit-plan/evals/fixtures/db-migration-runbook.md",
+      "expected_output": "Refuses to guess which mode was meant. Reports that --loop and --ploop are mutually exclusive and asks the user to pick one. Does not run any audit (no findings table, no Phase 1 output) in this turn.",
+      "files": [],
+      "assertions": [
+        "Output states --loop and --ploop cannot both be used and asks the user to choose one",
+        "No Critical/High/Medium findings table is produced in this turn",
+        "No Phase 1 completion message or verdict is produced in this turn"
+      ]
+    }
+  ]
+}
